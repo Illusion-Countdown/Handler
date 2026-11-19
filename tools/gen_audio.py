@@ -1,4 +1,10 @@
-"""HANDLER 程序化音效生成器 —— 纯 numpy，无外部素材。
+"""HANDLER 程序化音效（v2）—— 柔和版。
+
+原则：
+  · 只用正弦 / 三角 / 极低通噪声，不用方波、锯齿、生噪。
+  · 每个音都有柔和的起音与指数衰减，尾巴带一点混响。
+  · 峰值压到 0.5 左右，长音更轻，避免疲劳。
+
 运行：python tools/gen_audio.py
 """
 import os
@@ -9,19 +15,36 @@ SR = 44100
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "audio")
 
 
-def env(n, attack=0.005, decay=1.0, curve=3.0):
+# ---------------- 基础工具 ----------------
+def t_axis(dur):
+    return np.arange(int(SR * dur)) / SR
+
+
+def sine(freq, dur, phase=0.0):
+    t = t_axis(dur)
+    if np.isscalar(freq):
+        ph = 2 * np.pi * freq * t
+    else:
+        ph = 2 * np.pi * np.cumsum(freq) / SR
+    return np.sin(ph + phase)
+
+
+def tri(freq, dur):
+    t = t_axis(dur)
+    ph = 2 * np.pi * freq * t
+    return 2.0 / np.pi * np.arcsin(np.sin(ph))
+
+
+def env_ad(n, attack=0.008, decay=0.25, curve=3.0):
+    """平滑起音 + 指数衰减（无爆音）"""
     t = np.linspace(0, 1, n)
-    a = np.clip(t / max(attack, 1e-5), 0, 1)
-    d = np.exp(-t * curve / max(decay, 1e-5))
+    a = np.clip(t / max(attack, 1e-6), 0, 1)
+    a = a * a * (3 - 2 * a)          # smoothstep，起音更软
+    d = np.exp(-t * curve / max(decay, 1e-6))
     return a * d
 
 
-def noise(n):
-    return np.random.uniform(-1, 1, n)
-
-
-def lowpass(x, cutoff):
-    """一阶低通"""
+def one_pole_lp(x, cutoff):
     if cutoff >= SR / 2:
         return x
     a = np.exp(-2 * np.pi * cutoff / SR)
@@ -33,55 +56,31 @@ def lowpass(x, cutoff):
     return y
 
 
-def highpass(x, cutoff):
-    return x - lowpass(x, cutoff)
-
-
-def bandpass(x, lo, hi):
-    return highpass(lowpass(x, hi), lo)
-
-
-def sweep(f0, f1, dur, kind="sine"):
+def soft_noise(dur, cutoff=1800.0):
+    """极低通噪声：像风，不像静电"""
     n = int(SR * dur)
-    t = np.arange(n) / SR
-    f = np.linspace(f0, f1, n)
-    ph = 2 * np.pi * np.cumsum(f) / SR
-    if kind == "sine":
-        return np.sin(ph)
-    if kind == "saw":
-        return 2 * ((ph / (2 * np.pi)) % 1.0) - 1
-    return np.sign(np.sin(ph))
+    x = np.random.uniform(-1, 1, n)
+    x = one_pole_lp(x, cutoff)
+    x = one_pole_lp(x, cutoff)
+    return x
 
 
-def reverb(x, amount=0.25, decay=0.35):
+def reverb_soft(x, wet=0.22, decay=0.28):
     n = int(SR * decay)
-    ir = np.random.uniform(-1, 1, n) * np.exp(-np.arange(n) / (n * 0.35))
-    ir = lowpass(ir, 5000)
+    ir = np.random.uniform(-1, 1, n) * np.exp(-np.arange(n) / (n * 0.4))
+    ir = one_pole_lp(ir, 2600)
+    ir = np.concatenate([np.zeros(6), ir])       # 一点点预延迟，更自然
     ir /= np.max(np.abs(ir)) + 1e-9
-    wet = np.convolve(x, ir, mode="full")[: len(x)]
-    return x * (1 - amount) + wet * amount * 2.0
+    wet_sig = np.convolve(x, ir, mode="full")[: len(x)]
+    return x * (1 - wet) + wet_sig * wet * 1.6
 
 
-def norm(x, peak=0.85):
+def normalize(x, peak=0.5):
     m = np.max(np.abs(x))
-    if m < 1e-9:
-        return x
-    return x / m * peak
+    return x if m < 1e-9 else x / m * peak
 
 
-def save(name, x):
-    x = norm(np.tanh(x * 1.1), 0.86)
-    data = (x * 32767).astype(np.int16)
-    path = os.path.join(OUT, name + ".wav")
-    with wave.open(path, "wb") as w:
-        w.setnchannels(1)
-        w.setsampwidth(2)
-        w.setframerate(SR)
-        w.writeframes(data.tobytes())
-    print("  ", name, f"{len(x)/SR:.2f}s")
-
-
-def fade(x, ms=8):
+def fade(x, ms=10):
     n = int(SR * ms / 1000)
     if n * 2 >= len(x):
         return x
@@ -91,142 +90,159 @@ def fade(x, ms=8):
     return x * e
 
 
+def save(name, x, peak=0.5):
+    x = normalize(np.tanh(x * 0.8), peak)
+    x = fade(x, 12)
+    data = (x * 32767).astype(np.int16)
+    path = os.path.join(OUT, name + ".wav")
+    with wave.open(path, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(SR)
+        w.writeframes(data.tobytes())
+    print("  %-20s %.2fs" % (name, len(x) / SR))
+
+
+# ---------------- 音效 ----------------
 def main():
     os.makedirs(OUT, exist_ok=True)
     np.random.seed(86)
-    print("生成音效 ->", OUT)
+    print("生成音效 v2 ->", OUT)
 
-    # 1. 下令：短促的双音确认
-    n = int(SR * 0.16)
-    x = sweep(880, 1320, 0.07) * env(int(SR * 0.07), 0.002, 0.12, 5)
-    y = sweep(1320, 1760, 0.09) * env(int(SR * 0.09), 0.002, 0.14, 5)
-    sig = np.zeros(n)
-    sig[: len(x)] += x
-    sig[int(SR * 0.06): int(SR * 0.06) + len(y)] += y * 0.8
-    save("sfx_command", reverb(sig, 0.12, 0.2))
+    # 1 下令：两声柔和的上行钟
+    a = sine(660, 0.10) * env_ad(int(SR * 0.10), 0.004, 0.16, 4)
+    b = sine(880, 0.14) * env_ad(int(SR * 0.14), 0.004, 0.20, 4)
+    sig = np.zeros(int(SR * 0.26))
+    sig[: len(a)] += a * 0.55
+    off = int(SR * 0.07)
+    sig[off: off + len(b)] += b * 0.42
+    save("sfx_command", reverb_soft(sig, 0.25, 0.25), 0.42)
 
-    # 2. 确认
-    sig = sweep(1200, 900, 0.12) * env(int(SR * 0.12), 0.002, 0.16, 4)
-    save("sfx_confirm", reverb(sig, 0.1, 0.15))
+    # 2 确认：单音短钟
+    sig = sine(990, 0.10) * env_ad(int(SR * 0.10), 0.003, 0.13, 4.5)
+    save("sfx_confirm", reverb_soft(sig, 0.2, 0.18), 0.40)
 
-    # 3. 拒绝
-    sig = sweep(300, 180, 0.18, "saw") * env(int(SR * 0.18), 0.003, 0.2, 4)
-    save("sfx_deny", reverb(sig, 0.1, 0.12))
+    # 3 拒绝：低而短的两下
+    a = sine(233, 0.10) * env_ad(int(SR * 0.10), 0.005, 0.12, 3.5)
+    b = sine(196, 0.12) * env_ad(int(SR * 0.12), 0.005, 0.14, 3.5)
+    sig = np.zeros(int(SR * 0.22))
+    sig[: len(a)] += a * 0.5
+    off = int(SR * 0.08)
+    sig[off: off + len(b)] += b * 0.45
+    save("sfx_deny", reverb_soft(sig, 0.15, 0.2), 0.34)
 
-    # 4. 扫描 / 点亮
-    n = int(SR * 0.9)
-    t = np.arange(n) / SR
-    sw = sweep(200, 2400, 0.9) * env(n, 0.01, 0.9, 2.0)
-    hiss = bandpass(noise(n), 1500, 9000) * env(n, 0.01, 0.5, 3.0) * 0.35
-    save("sfx_scan", reverb(sw * 0.7 + hiss, 0.3, 0.4))
+    # 4 扫描：柔和上扫 + 一点点空气
+    dur = 0.75
+    n = int(SR * dur)
+    f = np.linspace(280, 760, n)
+    sig = sine(f, dur) * env_ad(n, 0.02, 0.6, 2.2)
+    air = soft_noise(dur, 1400) * env_ad(n, 0.05, 0.35, 2.6) * 0.35
+    save("sfx_scan", reverb_soft(sig * 0.7 + air, 0.3, 0.35), 0.36)
 
-    # 5. 命中
-    n = int(SR * 0.12)
-    sig = bandpass(noise(n), 800, 6000) * env(n, 0.001, 0.1, 8)
-    save("sfx_hit", sig)
+    # 5 命中：短促闷响（不是噪声爆）
+    n = int(SR * 0.07)
+    sig = sine(150, 0.07) * env_ad(n, 0.002, 0.06, 7) * 0.8
+    sig += soft_noise(0.07, 900) * env_ad(n, 0.002, 0.05, 8) * 0.5
+    save("sfx_hit", sig, 0.26)
 
-    # 6. 步枪
-    n = int(SR * 0.1)
-    sig = bandpass(noise(n), 600, 5000) * env(n, 0.0005, 0.06, 12)
-    sig += np.sin(2 * np.pi * 90 * np.arange(n) / SR) * env(n, 0.001, 0.05, 10) * 0.5
-    save("sfx_rifle", sig)
+    # 6 步枪：低频闷击 + 气声
+    n = int(SR * 0.09)
+    thump = sine(np.linspace(120, 62, n), 0.09) * env_ad(n, 0.001, 0.07, 9)
+    air = soft_noise(0.09, 1600) * env_ad(n, 0.001, 0.05, 10)
+    save("sfx_rifle", thump * 0.8 + air * 0.35, 0.30)
 
-    # 7. 炮击
-    n = int(SR * 0.5)
-    sig = bandpass(noise(n), 120, 2500) * env(n, 0.002, 0.28, 5)
-    sig += np.sin(2 * np.pi * 55 * np.arange(n) / SR) * env(n, 0.002, 0.3, 4) * 0.8
-    save("sfx_cannon", reverb(sig, 0.2, 0.3))
+    # 7 炮击：更低的轰
+    n = int(SR * 0.42)
+    thump = sine(np.linspace(88, 38, n), 0.42) * env_ad(n, 0.004, 0.30, 4.2)
+    air = soft_noise(0.42, 800) * env_ad(n, 0.004, 0.22, 4.5)
+    save("sfx_cannon", reverb_soft(thump * 0.9 + air * 0.4, 0.28, 0.35), 0.42)
 
-    # 8. 爆炸
-    n = int(SR * 0.9)
-    t = np.arange(n) / SR
-    boom = np.sin(2 * np.pi * (70 - 40 * t / 0.9) * t) * env(n, 0.002, 0.5, 4)
-    crack = bandpass(noise(n), 200, 7000) * env(n, 0.001, 0.35, 6) * 0.8
-    save("sfx_explosion", reverb(boom * 0.8 + crack, 0.32, 0.5))
+    # 8 爆炸
+    n = int(SR * 0.75)
+    boom = sine(np.linspace(62, 28, n), 0.75) * env_ad(n, 0.005, 0.5, 3.4)
+    rumble = soft_noise(0.75, 520) * env_ad(n, 0.006, 0.42, 3.2)
+    save("sfx_explosion", reverb_soft(boom * 0.9 + rumble * 0.55, 0.34, 0.55), 0.44)
 
-    # 9. 大爆炸
-    n = int(SR * 1.6)
-    t = np.arange(n) / SR
-    boom = np.sin(2 * np.pi * (55 - 35 * t / 1.6) * t) * env(n, 0.003, 0.9, 3)
-    crack = bandpass(noise(n), 80, 8000) * env(n, 0.001, 0.7, 4) * 0.9
-    save("sfx_explosion_big", reverb(boom * 0.9 + crack, 0.4, 0.9))
+    # 9 大爆炸
+    n = int(SR * 1.3)
+    boom = sine(np.linspace(48, 22, n), 1.3) * env_ad(n, 0.008, 0.95, 2.8)
+    rumble = soft_noise(1.3, 380) * env_ad(n, 0.01, 0.8, 2.6)
+    save("sfx_explosion_big", reverb_soft(boom * 0.9 + rumble * 0.6, 0.4, 0.9), 0.46)
 
-    # 10. 电极 / 干扰
-    n = int(SR * 0.7)
-    t = np.arange(n) / SR
-    sig = np.sin(2 * np.pi * (400 + 300 * np.sin(2 * np.pi * 13 * t)) * t)
-    sig *= (np.random.rand(n) > 0.35).astype(float)
-    sig *= env(n, 0.01, 0.6, 3)
-    sig += bandpass(noise(n), 2000, 12000) * 0.25
-    save("sfx_jam", reverb(sig, 0.2, 0.3))
+    # 10 干扰：轻微失谐的嗡鸣（不刺耳）
+    dur = 0.55
+    n = int(SR * dur)
+    t = t_axis(dur)
+    wob = 1.0 + 0.02 * np.sin(2 * np.pi * 3.2 * t)
+    sig = sine(320 * wob, dur) * 0.6 + sine(324 * wob, dur) * 0.4
+    sig *= env_ad(n, 0.03, 0.45, 2.4)
+    sig += soft_noise(dur, 900) * env_ad(n, 0.03, 0.3, 2.8) * 0.25
+    save("sfx_jam", reverb_soft(sig, 0.25, 0.3), 0.30)
 
-    # 11. 阵亡通讯中断
-    n = int(SR * 1.1)
-    t = np.arange(n) / SR
-    sig = bandpass(noise(n), 300, 4000) * (0.5 + 0.5 * np.sin(2 * np.pi * 9 * t))
-    sig *= np.exp(-t * 2.2)
-    sig += np.sin(2 * np.pi * 220 * t) * np.exp(-t * 6) * 0.4
-    save("sfx_death_signal", reverb(sig, 0.3, 0.4))
+    # 11 阵亡通讯中断：下行音 + 沙沙
+    dur = 0.85
+    n = int(SR * dur)
+    f = np.linspace(420, 190, n)
+    sig = sine(f, dur) * env_ad(n, 0.01, 0.65, 2.6)
+    sig += soft_noise(dur, 1200) * env_ad(n, 0.02, 0.5, 2.4) * 0.35
+    save("sfx_death_signal", reverb_soft(sig, 0.32, 0.45), 0.34)
 
-    # 12. 警报
-    n = int(SR * 0.8)
-    t = np.arange(n) / SR
-    sig = np.sin(2 * np.pi * 620 * t) * (0.5 + 0.5 * np.sign(np.sin(2 * np.pi * 4 * t)))
-    sig *= env(n, 0.01, 0.7, 2)
-    save("sfx_alarm", reverb(sig, 0.2, 0.3))
+    # 12 警报：两个柔和的交替音
+    dur = 0.7
+    n = int(SR * dur)
+    t = t_axis(dur)
+    gate = 0.5 + 0.5 * np.sin(2 * np.pi * 2.0 * t - np.pi / 2)
+    sig = sine(392, dur) * gate * 0.6 + sine(294, dur) * (1 - gate) * 0.5
+    sig *= env_ad(n, 0.03, 0.6, 2.2)
+    save("sfx_alarm", reverb_soft(sig, 0.28, 0.4), 0.32)
 
-    # 13. 波次开始
-    n = int(SR * 1.0)
-    t = np.arange(n) / SR
-    sig = np.sin(2 * np.pi * (110 + 20 * np.sin(2 * np.pi * 2 * t)) * t)
-    sig += np.sin(2 * np.pi * 165 * t) * 0.5
-    sig *= env(n, 0.02, 0.8, 2)
-    save("sfx_wave", reverb(sig, 0.25, 0.4))
+    # 13 波次开始：低频渐强
+    dur = 0.85
+    n = int(SR * dur)
+    swell = np.clip(np.linspace(0, 1, n) ** 1.6, 0, 1)
+    sig = (sine(110, dur) * 0.7 + sine(165, dur) * 0.3) * swell
+    sig *= np.exp(-np.linspace(0, 4, n) * 0.6)
+    save("sfx_wave", reverb_soft(sig, 0.3, 0.5), 0.36)
 
-    # 14. UI 点击
-    n = int(SR * 0.06)
-    sig = sweep(1600, 1200, 0.06) * env(n, 0.001, 0.05, 9)
-    save("sfx_ui", sig)
+    # 14 UI 点击：极轻的一点
+    n = int(SR * 0.045)
+    sig = sine(1150, 0.045) * env_ad(n, 0.001, 0.03, 9) * 0.6
+    save("sfx_ui", sig, 0.22)
 
-    # 15. 无线电开/关
-    for nm, up in (("sfx_radio_open", True), ("sfx_radio_close", False)):
-        n = int(SR * 0.22)
-        t = np.arange(n) / SR
-        f = np.linspace(700, 1400, n) if up else np.linspace(1400, 700, n)
-        sig = bandpass(noise(n), 400, 5000) * 0.6
-        sig += np.sin(2 * np.pi * f * t) * 0.4
-        sig *= env(n, 0.004, 0.2, 3)
-        save(nm, sig)
+    # 15 无线电 开 / 关
+    for nm, rising in (("sfx_radio_open", True), ("sfx_radio_close", False)):
+        dur = 0.16
+        n = int(SR * dur)
+        f = np.linspace(420, 700, n) if rising else np.linspace(700, 420, n)
+        sig = sine(f, dur) * env_ad(n, 0.006, 0.12, 4) * 0.6
+        sig += soft_noise(dur, 2200) * env_ad(n, 0.006, 0.08, 5) * 0.35
+        save(nm, reverb_soft(sig, 0.2, 0.15), 0.26)
 
-    # 16. 环境底噪（循环 8s）
-    n = int(SR * 8)
-    t = np.arange(n) / SR
-    base = lowpass(noise(n), 320) * 0.5
-    hum = np.sin(2 * np.pi * 48 * t) * 0.12 + np.sin(2 * np.pi * 96 * t) * 0.05
-    pulse = (0.6 + 0.4 * np.sin(2 * np.pi * 0.13 * t))
-    amb = (base + hum) * pulse
-    save("amb_drone", amb)
+    # 16 环境（音乐关闭时不播放，保留文件）
+    dur = 8.0
+    n = int(SR * dur)
+    t = t_axis(dur)
+    base = soft_noise(dur, 240) * 0.5
+    hum = sine(46, dur) * 0.10 + sine(92, dur) * 0.04
+    pulse = 0.7 + 0.3 * np.sin(2 * np.pi * 0.11 * t)
+    save("amb_drone", (base + hum) * pulse, 0.30)
 
-    # 17. 紧张音乐床（循环 12s）
-    n = int(SR * 12)
-    t = np.arange(n) / SR
+    # 17 紧张音床（音乐关闭时不播放）
+    dur = 12.0
+    n = int(SR * dur)
+    t = t_axis(dur)
     layers = np.zeros(n)
-    for f, a in ((55, 0.5), (82.5, 0.3), (110, 0.18), (164.8, 0.1)):
-        layers += np.sin(2 * np.pi * f * t + np.sin(2 * np.pi * 0.07 * t)) * a
-    layers *= 0.55 + 0.45 * np.sin(2 * np.pi * 0.055 * t)
-    perc = np.zeros(n)
-    for i in range(16):
-        st = int(SR * (i * 0.75 + 0.1))
-        m = int(SR * 0.25)
-        if st + m < n:
-            perc[st: st + m] += bandpass(noise(m), 900, 4000) * env(m, 0.002, 0.2, 5) * 0.16
-    save("mus_dread", layers * 0.7 + perc)
+    for f, a in ((55, 0.45), (82.5, 0.26), (110, 0.16), (164.8, 0.08)):
+        layers += sine(f, dur) * a
+    layers *= 0.62 + 0.38 * np.sin(2 * np.pi * 0.05 * t)
+    save("mus_dread", layers * 0.8, 0.28)
 
-    # 18. 脉冲点亮
-    n = int(SR * 0.5)
-    t = np.arange(n) / SR
-    sig = np.sin(2 * np.pi * (300 + 900 * t / 0.5) * t) * env(n, 0.005, 0.35, 3)
-    save("sfx_pulse", reverb(sig, 0.2, 0.3))
+    # 18 脉冲点亮
+    dur = 0.45
+    n = int(SR * dur)
+    f = np.linspace(340, 820, n)
+    sig = sine(f, dur) * env_ad(n, 0.008, 0.32, 3.0)
+    save("sfx_pulse", reverb_soft(sig, 0.3, 0.3), 0.34)
 
     print("完成。")
 

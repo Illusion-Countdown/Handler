@@ -61,6 +61,16 @@ func impact(pos: Vector2, col: Color, size: float = 1.0) -> void:
 			"col": col, "t": randf_range(0.12, 0.3), "max": 0.3})
 
 
+func order_marker(pos: Vector2) -> void:
+	rings.append({"p": pos, "col": Color(0.45, 0.9, 1.0), "r": 4.0, "t": 0.55, "max": 0.55, "rmax": 46.0})
+	rings.append({"p": pos, "col": Color(0.9, 1.0, 1.0), "r": 2.0, "t": 0.35, "max": 0.35, "rmax": 22.0})
+	for i in range(3):
+		var a := -PI * 0.5 + (i - 1) * 0.5
+		debris_list.append({"p": pos + Vector2.RIGHT.rotated(a) * 10.0,
+			"v": Vector2.RIGHT.rotated(a) * 90.0,
+			"col": Color(0.5, 0.95, 1.0), "t": 0.3, "max": 0.3})
+
+
 func ripple(pos: Vector2, col: Color, radius: float) -> void:
 	ripples.append({"p": pos, "r": radius, "col": col, "t": 0.5, "max": 0.5})
 

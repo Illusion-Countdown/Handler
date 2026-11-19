@@ -59,6 +59,8 @@ func available_nodes() -> Array:
 
 
 func _input(event: InputEvent) -> void:
+	if not visible:
+		return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		var mp := get_local_mouse_position()
 		if mode == "map":
@@ -76,6 +78,8 @@ func _input(event: InputEvent) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if not visible:
+		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER:
 			if mode == "end":

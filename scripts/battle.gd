@@ -894,7 +894,17 @@ func _on_left_click(wp: Vector2) -> void:
 		selected = best
 		return
 	if selected == null:
-		return
+		# 没选中时，自动选最近的编队
+		var nbest: Squad = null
+		var nbd := 1e20
+		for sq2 in squads:
+			var dd: float = wp.distance_to(sq2.center)
+			if dd < nbd:
+				nbd = dd
+				nbest = sq2
+		if nbest == null:
+			return
+		selected = nbest
 	# 点敌人 = 集火
 	var tgt = null
 	var td := 1e20
@@ -911,6 +921,8 @@ func _on_left_click(wp: Vector2) -> void:
 		else:
 			_push_hint("看不见那个目标", 1.0)
 		return
+	vfx.order_marker(wp)
+	_sfx("sfx_ui", 0.05, -12.0, 1.2)
 	_issue_order(selected, {"cmd": "move", "pos": wp})
 
 
@@ -938,8 +950,7 @@ func _on_right_click() -> void:
 
 
 func _issue_order(sq: Squad, data: Dictionary) -> void:
-	if sq.broken:
-		_push_hint("编队已崩溃，先收容", 1.2)
+	if sq.size_alive() == 0:
 		return
 	var er := sq.exec_rate() / 100.0
 	sq.order = data.duplicate()
@@ -1217,6 +1228,13 @@ func _draw_overlay() -> void:
 		overlay.draw_arc(sq.center, 40.0, 0.0, TAU, 28, Color(c.r, c.g, c.b, 0.16), 1.1)
 		if sq == selected:
 			overlay.draw_arc(sq.center, 46.0, 0.0, TAU, 32, Color(1, 1, 1, 0.22), 1.3)
+		# 移动目标点
+		if sq.has_dest:
+			var dc := Color(0.40, 0.85, 1.0)
+			overlay.draw_line(sq.center, sq.dest, Color(dc.r, dc.g, dc.b, 0.16), 1.0)
+			overlay.draw_arc(sq.dest, 13.0, 0.0, TAU, 20, Color(dc.r, dc.g, dc.b, 0.7), 1.8)
+			overlay.draw_line(sq.dest + Vector2(-7, 0), sq.dest + Vector2(7, 0), Color(0.8, 0.97, 1.0, 0.9), 1.4)
+			overlay.draw_line(sq.dest + Vector2(0, -7), sq.dest + Vector2(0, 7), Color(0.8, 0.97, 1.0, 0.9), 1.4)
 		# 命令回执
 		if sq.feedback_t > 0.0:
 			var f: float = 1.0 - sq.feedback_t / 0.45

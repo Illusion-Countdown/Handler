@@ -112,6 +112,8 @@ func update(dt: float, battle) -> void:
 	integrity = strength() * 100.0
 
 	if broken:
+		if has_dest:
+			_move_squad(dt, battle)
 		_update_members(dt)
 		return
 

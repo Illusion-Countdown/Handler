@@ -273,8 +273,9 @@ func _separate(dt: float) -> void:
 						dv = Vector2(0.0, -1.0)
 						dist = 1.0
 					var push := dv / dist * (mind - dist) * 0.6
-					m.position += push
-					e.position -= push
+					# 我方更"重"：被推得少，敌人让位
+					m.position += push * 0.2
+					e.position -= push * 1.1
 		for i2 in range(alive_m.size()):
 			var m1 = alive_m[i2]
 			for j2 in range(i2 + 1, alive_m.size()):
@@ -400,8 +401,11 @@ func _apply_order(sq: Squad) -> void:
 	# 指令一定执行；信任决定效果强度，而不是"听不听"
 	match String(od.get("cmd", "")):
 		"move":
-			sq.dest = od["pos"]
+			var p2: Vector2 = resolve_obstacle(od["pos"], 42.0)
+			sq.dest = p2
 			sq.has_dest = true
+			sq.last_dl = 1e9
+			sq.stall_t = 0.0
 			sq.formation_t = 6.0
 			_push_hint("%s：向目标推进" % sq.label, 0.9)
 		"focus":
@@ -925,9 +929,10 @@ func _on_left_click(wp: Vector2) -> void:
 		else:
 			_push_hint("看不见那个目标", 1.0)
 		return
-	vfx.order_marker(wp)
+	var fixed: Vector2 = resolve_obstacle(wp, 42.0)
+	vfx.order_marker(fixed)
 	_sfx("sfx_ui", 0.05, -12.0, 1.2)
-	_issue_order(selected, {"cmd": "move", "pos": wp})
+	_issue_order(selected, {"cmd": "move", "pos": fixed})
 
 
 func _on_right_click() -> void:

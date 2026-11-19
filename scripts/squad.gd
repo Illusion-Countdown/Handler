@@ -32,6 +32,8 @@ var no_retreat_t: float = 0.0
 var resonance: float = 0.0      # 合流同步共振
 var feedback_t: float = 0.0     # 命令回执（视觉反馈）
 var grace: float = 0.0          # 收容后的宽限
+var stall_t: float = 0.0
+var last_dl: float = 1e9
 var silence_t: float = 0.0
 var jammed_t: float = 0.0
 var order: Dictionary = {}      # 当前在途命令
@@ -77,8 +79,10 @@ func _recalc_center() -> void:
 	for m in a:
 		c += m.position
 	c = c / float(a.size())
-	# 软跟随：中心不会被成员的槽位微动带着跳
-	center = center.lerp(c, 0.34)
+	# 移动中：中心绝对权威（保证走直线、必到达）
+	# 站定时：软跟随成员，避免槽位微动带着中心跳
+	if not has_dest:
+		center = center.lerp(c, 0.34)
 
 
 func strength() -> float:
@@ -164,6 +168,7 @@ func _move_squad(dt: float, battle) -> void:
 	if has_dest:
 		tgt = dest
 		if center.distance_to(dest) < 18.0:
+			center = dest
 			has_dest = false
 			tgt = center
 	elif stance == "withdraw" and not broken:
@@ -175,6 +180,21 @@ func _move_squad(dt: float, battle) -> void:
 
 	var to := tgt - center
 	var dl := to.length()
+	# 停滞检测：1.2 秒没有靠近就认为到了（防止绕障无限打转）
+	if has_dest:
+		if dl < last_dl - 0.6:
+			last_dl = dl
+			stall_t = 0.0
+		else:
+			stall_t += dt
+			if stall_t > 1.2:
+				has_dest = false
+				stall_t = 0.0
+				dl = 0.0
+				to = Vector2.ZERO
+	else:
+		stall_t = 0.0
+		last_dl = 1e9
 	if dl > 16.0:
 		var step := to.normalized() * spd * dt
 		if step.length() > dl:

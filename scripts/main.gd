@@ -121,7 +121,7 @@ func _run_test() -> void:
 		battle.shadow_update(1.0 / 30.0)
 		if battle == null:
 			break
-		if i % 30 == 0 and battle != null and i < 200:
+		if i % 30 == 0 and battle != null and i < 420:
 			print("[MOVE] t=", snapped(battle.elapsed, 0.1),
 				" dist=", snapped(battle.squads[0].center.distance_to(move_to), 1.0),
 				" has_dest=", battle.squads[0].has_dest)

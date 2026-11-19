@@ -256,32 +256,57 @@ func _separate(dt: float) -> void:
 	for e in legions:
 		if not e.dead:
 			alive_l.append(e)
-	# 机体 vs 地形 / 军团
+	var alive_m: Array = []
 	for m in mechs:
-		if m.dead:
-			continue
-		m.position = resolve_obstacle(m.position, 13.0)
+		if not m.dead:
+			alive_m.append(m)
+	# 两轮迭代，挤开更稳
+	for _it in range(2):
+		# 军团 vs 地形
 		for e in alive_l:
-			var dv: Vector2 = m.position - e.position
-			var dist := dv.length()
-			var mind: float = 15.0 + e.size * 0.6
-			if dist < mind and dist > 0.01:
-				var push := dv / dist * (mind - dist) * 0.55
-				m.position += push
-				e.position -= push
-	# 军团 vs 地形 / 军团
-	for i in range(alive_l.size()):
-		var a = alive_l[i]
-		a.position = resolve_obstacle(a.position, a.size * 0.85)
-		for j in range(i + 1, alive_l.size()):
-			var b = alive_l[j]
-			var d2: Vector2 = a.position - b.position
-			var dist2 := d2.length()
-			var mind2: float = (a.size + b.size) * 0.62
-			if dist2 < mind2 and dist2 > 0.01:
-				var push2 := d2 / dist2 * (mind2 - dist2) * 0.5
-				a.position += push2
-				b.position -= push2
+			e.position = resolve_obstacle(e.position, e.size * 1.15)
+		# 军团 vs 军团
+		for i in range(alive_l.size()):
+			var a = alive_l[i]
+			for j in range(i + 1, alive_l.size()):
+				var b = alive_l[j]
+				var d2: Vector2 = a.position - b.position
+				var dist2 := d2.length()
+				var mind2: float = (a.size + b.size) * 1.15
+				if dist2 < mind2:
+					if dist2 < 0.01:
+						d2 = Vector2.RIGHT.rotated(randf() * TAU)
+						dist2 = 1.0
+					var push2 := d2 / dist2 * (mind2 - dist2) * 0.55
+					a.position += push2
+					b.position -= push2
+		# 机体 vs 地形 / 军团 / 机体
+		for m in alive_m:
+			m.position = resolve_obstacle(m.position, 13.0)
+			for e in alive_l:
+				var dv: Vector2 = m.position - e.position
+				var dist := dv.length()
+				var mind: float = 14.0 + e.size * 1.15
+				if dist < mind:
+					if dist < 0.01:
+						dv = Vector2(0.0, -1.0)
+						dist = 1.0
+					var push := dv / dist * (mind - dist) * 0.6
+					m.position += push
+					e.position -= push
+		for i2 in range(alive_m.size()):
+			var m1 = alive_m[i2]
+			for j2 in range(i2 + 1, alive_m.size()):
+				var m2 = alive_m[j2]
+				var dm: Vector2 = m1.position - m2.position
+				var dmn := dm.length()
+				if dmn < 26.0:
+					if dmn < 0.01:
+						dm = Vector2(0.0, -1.0)
+						dmn = 1.0
+					var pm := dm / dmn * (26.0 - dmn) * 0.5
+					m1.position += pm
+					m2.position -= pm
 
 
 func map_center() -> Vector2:

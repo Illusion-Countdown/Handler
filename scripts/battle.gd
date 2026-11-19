@@ -273,9 +273,9 @@ func _separate(dt: float) -> void:
 						dv = Vector2(0.0, -1.0)
 						dist = 1.0
 					var push := dv / dist * (mind - dist) * 0.6
-					# 我方更"重"：被推得少，敌人让位
-					m.position += push * 0.2
-					e.position -= push * 1.1
+					# 我方是"重物"：基本不动，敌人全部让位
+					m.position += push * 0.02
+					e.position -= push * 1.25
 		for i2 in range(alive_m.size()):
 			var m1 = alive_m[i2]
 			for j2 in range(i2 + 1, alive_m.size()):

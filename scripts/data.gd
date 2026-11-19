@@ -9,8 +9,8 @@ const GRID_W := 56
 const GRID_H := 40
 
 const MECH_BASE := {
-	"hp": 190.0, "atk": 17.0, "aspd": 1.05, "range": 4.2,
-	"speed": 2.2, "armor": 0.36, "vision": 6.0, "vision_angle": 140.0, "scout": 2.0,
+	"hp": 190.0, "atk": 13.0, "aspd": 1.0, "range": 3.8,
+	"speed": 2.2, "armor": 0.30, "vision": 6.0, "vision_angle": 140.0, "scout": 2.0,
 }
 
 # ---------------- 机体配置 ----------------
@@ -62,12 +62,12 @@ const CONFIG_IDS := ["melee", "rifle", "sniper", "suppress", "heavy", "recon", "
 # ---------------- 军团 ----------------
 const LEGION := {
 	"infantry": {
-		"name": "步兵型", "hp": 50.0, "atk": 5.2, "aspd": 1.05, "range": 3.0,
-		"speed": 1.85, "armor": 0.0, "danger": 1.0, "size": 9.0,
+		"name": "步兵型", "hp": 60.0, "atk": 6.0, "aspd": 1.05, "range": 3.0,
+		"speed": 2.55, "armor": 0.0, "danger": 1.0, "size": 9.0,
 	},
 	"armored": {
 		"name": "装甲型", "hp": 150.0, "atk": 11.0, "aspd": 0.5, "range": 3.2,
-		"speed": 1.35, "armor": 0.32, "danger": 2.4, "size": 12.0, "charge": true,
+		"speed": 1.8, "armor": 0.32, "danger": 2.4, "size": 12.0, "charge": true,
 	},
 	"artillery": {
 		"name": "炮击型", "hp": 65.0, "atk": 18.0, "aspd": 0.3, "range": 9.0,

@@ -92,6 +92,7 @@ func _run_flow() -> void:
 			print("[FLOW] choice: ", campaign.choice_title, " n=", campaign.choices.size())
 			campaign._pick_choice(0)
 		await get_tree().process_frame
+	print("[FLOW] sfx_played=", Audio.play_count)
 	print("[FLOW] done node=", G.node_id, " deck=", G.deck.size(),
 		" squads=", G.run_squads.size(), " mechs=", G.total_mechs(),
 		" pressure=", G.pressure)
@@ -275,6 +276,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _start_campaign() -> void:
+	var a = get_node_or_null("/root/Audio")
+	if a != null:
+		a.play("sfx_radio_open", -3.0)
 	_clear_world()
 	campaign = CampaignScreen.new()
 	add_child(campaign)

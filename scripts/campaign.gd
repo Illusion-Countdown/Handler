@@ -103,6 +103,7 @@ func _enter_node(id: String) -> void:
 		return
 	G.node_id = id
 	G.act = int(n.get("act", G.act))
+	_ui_sound("sfx_ui")
 	var ty: String = n.get("type", "battle")
 	match ty:
 		"battle", "boss":
@@ -248,6 +249,7 @@ func _open_rest(n: Dictionary) -> void:
 
 func _pick_choice(i: int) -> void:
 	var c: Dictionary = choices[i]
+	_ui_sound("sfx_confirm")
 	var act: String = c.get("act", "")
 	match act:
 		"deep":
@@ -438,6 +440,12 @@ func _open_reward(lost: int) -> void:
 	]
 	if G.run_squads.size() < 3 and G.total_mechs() >= 3:
 		choices.append({"t": "重组编队", "d": "把一个编队拆成两支", "act": "split"})
+
+
+func _ui_sound(n: String) -> void:
+	var a = get_node_or_null("/root/Audio")
+	if a != null:
+		a.play(n, -4.0)
 
 
 func _flash(s: String) -> void:

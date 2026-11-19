@@ -15,6 +15,7 @@ var idx: int = 0
 var music: AudioStreamPlayer
 var amb: AudioStreamPlayer
 var last_frame: Dictionary = {}
+var play_count: int = 0
 
 
 func _ready() -> void:
@@ -51,9 +52,10 @@ func _ready() -> void:
 		amb.play()
 
 
-func play(n: String, vol_db: float = -4.0, pitch: float = 1.0) -> void:
+func play(n: String, vol_db: float = -2.0, pitch: float = 1.0) -> void:
 	if not streams.has(n):
 		return
+	play_count += 1
 	var pl: AudioStreamPlayer = players[idx]
 	idx = (idx + 1) % players.size()
 	pl.stream = streams[n]

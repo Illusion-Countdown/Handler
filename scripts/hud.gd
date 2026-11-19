@@ -59,6 +59,15 @@ func _draw_hud() -> void:
 	_draw_hint(vs)
 	_draw_footer(vs)
 	_draw_pause(vs)
+	_draw_over(vs)
+
+
+func _draw_over(vs: Vector2) -> void:
+	if battle.state != "over":
+		return
+	canvas.draw_rect(Rect2(Vector2.ZERO, vs), Color(0.0, 0.02, 0.05, 0.45))
+	canvas.draw_string(font, Vector2(vs.x * 0.5 - 240, vs.y * 0.5), "作 战 结 束",
+		HORIZONTAL_ALIGNMENT_CENTER, 480, 40, Color(0.8, 0.95, 1.0))
 
 
 func _draw_pause(vs: Vector2) -> void:

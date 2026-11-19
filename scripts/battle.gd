@@ -202,6 +202,10 @@ func _spawn_wave(i: int) -> void:
 	var bearings: Array = w.get("bearings", [0.0])
 	var center := map_center()
 	var radius: float = min(world_size.x, world_size.y) * 0.40
+	if wave_idx < 3:
+		_sfx("sfx_wave", 0.6, -6.0)
+		if String(w["type"]) == "armored" or String(w["type"]) == "shepherd":
+			_sfx("sfx_alarm", 0.6, -6.0)
 	for k in range(count):
 		var b: float = float(bearings[k % bearings.size()])
 		if count > 1:
@@ -224,6 +228,10 @@ func _spawn_legion(kind: String, pos: Vector2, hp_mult: float = 1.0) -> void:
 
 # ---------------- 主循环 ----------------
 func _process(delta: float) -> void:
+	if state == "over" and not result_sent:
+		_over_t += delta
+		if _over_t > 3.0:
+			_emit_result()
 	shadow_update(delta)
 
 
@@ -541,8 +549,13 @@ func _mech_attack(m, e) -> void:
 		m.kills += 1
 		G.total_kills += 1
 		vfx.explosion(e.position, Color(1.0, 0.35, 0.2), 16.0 + e.size)
+		_sfx("sfx_explosion", 0.07, -4.0)
 		shake = max(shake, 0.22)
 	vfx.tracer(m.position, e.position, Color(0.75, 0.95, 1.0), 0.07)
+	if m.cfg_id == "sniper" or m.cfg_id == "suppress":
+		_sfx("sfx_rifle", 0.05, -9.0, 0.72)
+	else:
+		_sfx("sfx_rifle", 0.04, -9.0, 1.0)
 	if m.cfg_id == "sniper":
 		vfx.tracer(m.position, e.position, Color(0.9, 1.0, 1.0), 0.12)
 	if m.cfg_id == "suppress":
@@ -578,6 +591,7 @@ func _legion_attack(e) -> void:
 		m.squad.facing = lerp_angle(m.squad.facing,
 			(e.position - m.squad.center).angle(), 0.7)
 	vfx.tracer(e.position, m.position, Color(1.0, 0.4, 0.25), 0.08)
+	_sfx("sfx_hit", 0.08, -11.0, 1.0)
 	if m.dead:
 		_on_mech_death(m)
 
@@ -590,6 +604,8 @@ func _guard_of(sq):
 
 
 func _shockwave(e) -> void:
+	_sfx("sfx_cannon", 0.3, -2.0, 0.9)
+	_sfx("sfx_explosion_big", 0.3, -3.0)
 	vfx.explosion(e.position, Color(1.0, 0.45, 0.2), 46.0)
 	shake = 0.5
 	for m in mechs:
@@ -607,6 +623,8 @@ func _shockwave(e) -> void:
 func _on_mech_death(m) -> void:
 	deaths.append(m)
 	_fx_flash(0.45, Color(0.5, 0.85, 1.0))
+	_sfx("sfx_death_signal", 0.4, -2.0)
+	_sfx("sfx_explosion_big", 0.3, -4.0)
 	vfx.explosion(m.position, Color(0.6, 0.9, 1.0), 26.0)
 	shake = max(shake, 0.4)
 	# 大脑回收任务
@@ -648,6 +666,9 @@ func _update_fog(dt: float) -> void:
 		fog.stamp_mech(m, dt)
 	fog.tick(dt)
 	for e in legions:
+		if e.dead:
+			e.visible = false
+			continue
 		var lit: bool = enemy_lit(e)
 		e.visible = lit
 		if lit:
@@ -692,6 +713,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		match event.keycode:
 			KEY_SPACE:
 				paused = not paused
+				_sfx("sfx_ui", 0.1, -4.0)
 			KEY_Q:
 				if selected != null:
 					selected.stance = GameData.STANCES[(GameData.STANCES.find(selected.stance) + 1) % 4]
@@ -765,7 +787,8 @@ func _on_right_click() -> void:
 	var radius_cells: float = max(4.0, 7.0 - dist_cells * 0.1)
 	fog.stamp_pulse(wp, radius_cells * GameData.CELL)
 	vfx.pulse(wp, radius_cells * GameData.CELL)
-	_audio("scan")
+	_sfx("sfx_scan", 0.15, -2.0)
+	_sfx("sfx_pulse", 0.15, -6.0, 1.1)
 	# 标记范围内敌人
 	for e in legions:
 		if e.dead:
@@ -786,8 +809,7 @@ func _issue_order(sq: Squad, data: Dictionary) -> void:
 	sq.feedback_t = 0.45
 	_apply_order(sq)
 	sq.order = {}
-	_audio("command")
-	_fx_flash(0.05, Color(0.35, 0.8, 1.0))
+	_sfx("sfx_command", 0.06, -2.0)
 
 
 func _resolve_orders() -> void:
@@ -808,12 +830,14 @@ func _play_card_idx(idx: int) -> void:
 		return
 	if cp < float(card["cost"]):
 		_push_hint("指令点不足", 1.0)
+		_sfx("sfx_deny", 0.15, -3.0)
 		return
 	if selected == null and card["kind"] == "squad":
 		_push_hint("先选中一个编队", 1.0)
 		return
 	cp -= float(card["cost"])
 	used_cards.append(cid)
+	_sfx("sfx_confirm", 0.12, -2.0)
 	_apply_card(cid)
 	_audio("confirm")
 
@@ -899,12 +923,25 @@ func _recover(sq) -> void:
 		return
 	sq.recovering = 2.5
 	_push_hint("%s：收容中…" % sq.label, 2.5)
-	_audio("confirm")
+	_sfx("sfx_confirm", 0.2, -3.0)
 
 
 func _push_hint(text: String, dur: float = 2.0) -> void:
 	hint_text = text
 	hint_t = dur
+
+
+var _sfx_last: Dictionary = {}
+
+
+func _sfx(n: String, gap: float = 0.05, vol: float = -3.0, pitch: float = 1.0) -> void:
+	var now: float = Time.get_ticks_msec() / 1000.0
+	if now - float(_sfx_last.get(n, -99.0)) < gap:
+		return
+	_sfx_last[n] = now
+	var a = get_node_or_null("/root/Audio")
+	if a != null:
+		a.play(n, vol, pitch + randf_range(-0.07, 0.07))
 
 
 func _fx_flash(strength: float, col: Color) -> void:
@@ -939,9 +976,13 @@ func _check_end() -> void:
 			_finish(true)
 
 
+var _pending_res: Dictionary = {}
+var _over_t: float = 0.0
+
+
 func _finish(win: bool) -> void:
-	print("[BT] finish win=", win, " t=", elapsed, " legions=", legions.size(), " all_spawned=", all_spawned)
-	result_sent = true
+	if state == "over":
+		return
 	state = "over"
 	var lost := 0
 	for m in mechs:
@@ -949,15 +990,22 @@ func _finish(win: bool) -> void:
 			lost += 1
 	G.brains_saved += brains_saved
 	G.brains_lost += brains_lost
-	var res := {
+	_pending_res = {
 		"win": win,
 		"lost": lost,
 		"brains_saved": brains_saved,
 		"brains_lost": brains_lost,
 		"time": elapsed,
 	}
-	await get_tree().create_timer(1.2).timeout
-	battle_finished.emit(res)
+	await get_tree().create_timer(1.4, true, false, true).timeout
+	_emit_result()
+
+
+func _emit_result() -> void:
+	if result_sent:
+		return
+	result_sent = true
+	battle_finished.emit(_pending_res)
 
 
 # ---------------- 绘制 ----------------

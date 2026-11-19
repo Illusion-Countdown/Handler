@@ -112,10 +112,19 @@ func _run_test() -> void:
 		get_tree().quit()
 		return
 	print("[TEST] battle started, waves=", battle.waves.size(), " mechs=", battle.mechs.size())
+	# 移动指令验收：点一个 300px 外的点，看它是否走到并停下
+	var move_from: Vector2 = battle.squads[0].center
+	var move_to: Vector2 = move_from + Vector2(300, 0)
+	battle._issue_order(battle.squads[0], {"cmd": "move", "pos": move_to})
+	print("[MOVE] from=", move_from, " to=", move_to)
 	for i in range(1200):
 		battle.shadow_update(1.0 / 30.0)
 		if battle == null:
 			break
+		if i % 30 == 0 and battle != null and i < 200:
+			print("[MOVE] t=", snapped(battle.elapsed, 0.1),
+				" dist=", snapped(battle.squads[0].center.distance_to(move_to), 1.0),
+				" has_dest=", battle.squads[0].has_dest)
 		if i % 150 == 0 and battle != null:
 			var l0 = battle.legions[0] if battle.legions.size() > 0 else null
 			var mh := []

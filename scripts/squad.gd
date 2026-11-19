@@ -76,7 +76,9 @@ func _recalc_center() -> void:
 	var c := Vector2.ZERO
 	for m in a:
 		c += m.position
-	center = c / float(a.size())
+	c = c / float(a.size())
+	# 软跟随：中心不会被成员的槽位微动带着跳
+	center = center.lerp(c, 0.34)
 
 
 func strength() -> float:
@@ -161,7 +163,7 @@ func _move_squad(dt: float, battle) -> void:
 	# 移动完全由玩家点击决定：不再自动冲向敌人
 	if has_dest:
 		tgt = dest
-		if center.distance_to(dest) < 8.0:
+		if center.distance_to(dest) < 18.0:
 			has_dest = false
 			tgt = center
 	elif stance == "withdraw" and not broken:
@@ -172,12 +174,15 @@ func _move_squad(dt: float, battle) -> void:
 			tgt = center + (center - e.position).normalized() * 55.0
 
 	var to := tgt - center
-	if to.length() > 4.0:
+	var dl := to.length()
+	if dl > 16.0:
 		var step := to.normalized() * spd * dt
-		if step.length() > to.length():
+		if step.length() > dl:
 			step = to
 		center += step
-		facing = lerp_angle(facing, to.angle(), clamp(dt * 7.0, 0.0, 1.0))
+		# 只有真的在赶路时才转向，否则会在目的地原地旋转
+		if dl > 34.0:
+			facing = lerp_angle(facing, to.angle(), clamp(dt * 5.0, 0.0, 1.0))
 	center.x = clamp(center.x, 40.0, GameData.GRID_W * GameData.CELL - 40.0)
 	center.y = clamp(center.y, 40.0, GameData.GRID_H * GameData.CELL - 40.0)
 	if battle != null:

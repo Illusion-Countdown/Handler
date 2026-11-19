@@ -20,6 +20,8 @@ var broken: bool = false
 var recovering: float = 0.0
 var recover_cd: float = 0.0
 var focus = null
+var focus_power: float = 1.3
+var formation_t: float = 0.0
 var index: int = 0
 var label: String = "中央"
 var attention: float = 1.0
@@ -91,6 +93,7 @@ func update(dt: float, battle) -> void:
 	no_retreat_t = max(0.0, no_retreat_t - dt)
 	resonance = max(0.0, resonance - dt)
 	feedback_t = max(0.0, feedback_t - dt)
+	formation_t = max(0.0, formation_t - dt)
 	silence_t = max(0.0, silence_t - dt)
 	_recalc_center()
 
@@ -224,7 +227,7 @@ func exec_rate() -> float:
 	for m in members:
 		if m.pilot.has("trust"):
 			trust = max(trust, float(m.pilot["trust"]))
-	var base := 46.0 + 0.45 * trust + (attention - 1.0 / float(n)) * 100.0
+	var base := 68.0 + 0.28 * trust + (attention - 1.0 / float(n)) * 100.0
 	# 指挥型加成
 	for m in alive():
 		if m.cfg_id == "command":

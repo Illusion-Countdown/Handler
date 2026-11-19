@@ -52,7 +52,7 @@ func _ready() -> void:
 		amb.play()
 
 
-func play(n: String, vol_db: float = -2.0, pitch: float = 1.0) -> void:
+func play(n: String, vol_db: float = -8.0, pitch: float = 1.0) -> void:
 	if not streams.has(n):
 		return
 	play_count += 1

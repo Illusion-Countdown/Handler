@@ -52,6 +52,15 @@ func debris(pos: Vector2, col: Color, count: int = 6) -> void:
 			"col": col, "t": randf_range(0.25, 0.55), "max": 0.55})
 
 
+func impact(pos: Vector2, col: Color, size: float = 1.0) -> void:
+	rings.append({"p": pos, "col": col, "r": 3.0, "t": 0.22, "max": 0.22, "rmax": 26.0 * size})
+	for i in range(5):
+		var a := randf() * TAU
+		var sp := randf_range(70.0, 210.0) * size
+		debris_list.append({"p": pos, "v": Vector2.RIGHT.rotated(a) * sp,
+			"col": col, "t": randf_range(0.12, 0.3), "max": 0.3})
+
+
 func ripple(pos: Vector2, col: Color, radius: float) -> void:
 	ripples.append({"p": pos, "r": radius, "col": col, "t": 0.5, "max": 0.5})
 

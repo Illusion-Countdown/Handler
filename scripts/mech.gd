@@ -25,7 +25,7 @@ var kills: int = 0
 var slot_offset: Vector2 = Vector2.ZERO
 var wander: float = 0.0
 
-const TRAIL_MAX := 14
+const TRAIL_MAX := 20
 
 
 func setup(config_id: String, p_pilot: Dictionary, pos: Vector2) -> void:
@@ -92,13 +92,18 @@ func _draw() -> void:
 	if trail.size() >= 2:
 		for i in range(trail.size() - 1):
 			var t := 1.0 - float(i) / float(trail.size())
-			var a := t * t * 0.5
-			var w := 2.4 * t + 0.6
+			var a := t * t * 0.95
+			var w := 3.4 * t + 0.7
 			draw_line(trail[i] - position, trail[i + 1] - position,
-				Color(col.r, col.g, col.b, a), w)
-	# 悬浮环
+				Color(col.r * 1.5, col.g * 1.9, col.b * 2.1, a), w)
+		# 白热芯
+		draw_line(trail[0] - position, trail[1] - position,
+			Color(2.6, 3.2, 3.6, 0.9), 2.0)
+	# 引擎光
+	draw_circle(Vector2.ZERO, 22.0, Color(col.r * 0.9, col.g * 1.6, col.b * 2.0, 0.10))
+	draw_circle(Vector2.ZERO, 14.0, Color(col.r * 1.2, col.g * 2.0, col.b * 2.6, 0.16))
 	if not dead:
-		draw_arc(Vector2.ZERO, 11.0, 0.0, TAU, 16, Color(col.r, col.g, col.b, 0.16), 1.0)
+		draw_arc(Vector2.ZERO, 13.0, 0.0, TAU, 20, Color(col.r * 2.0, col.g * 2.6, col.b * 3.0, 0.45), 1.4)
 	# 三角
 	var s := 12.0
 	var pts := PackedVector2Array()
@@ -106,13 +111,17 @@ func _draw() -> void:
 	pts.append(Vector2(-s * 0.72, s * 0.62).rotated(facing))
 	pts.append(Vector2(-s * 0.42, 0.0).rotated(facing))
 	pts.append(Vector2(-s * 0.72, -s * 0.62).rotated(facing))
-	var body := Color(col.r, col.g, col.b, 0.95)
+	var body := Color(0.10, 0.32, 0.40, 1.0)
+	if m_overdrive():
+		body = Color(0.55, 0.30, 0.10, 1.0)
 	if flash > 0.0:
-		body = body.lerp(Color(1, 1, 1, 1), flash)
+		body = body.lerp(Color(1.8, 1.8, 1.8, 1.0), flash)
 	if stagger > 0.0:
-		body = body.lerp(Color(1.0, 0.55, 0.35, 1.0), 0.5)
+		body = body.lerp(Color(1.6, 0.5, 0.3, 1.0), 0.6)
 	draw_colored_polygon(pts, body)
-	draw_polyline(_closed(pts), Color(col.r * 1.2, col.g * 1.2, col.b * 1.2, 0.85), 1.6, true)
+	draw_polyline(_closed(pts), Color(col.r * 2.2, col.g * 2.6, col.b * 3.0, 1.0), 2.0, true)
+	# 白热芯
+	draw_circle(Vector2.ZERO, 2.6, Color(3.0, 3.4, 3.8, 1.0))
 	# 血量条
 	var w := 26.0
 	var f := hp_frac()
@@ -124,6 +133,10 @@ func _draw() -> void:
 	draw_rect(Rect2(-w * 0.5, by, w * f, 2.6), hc)
 	if stagger > 0.0:
 		draw_arc(Vector2.ZERO, 17.0, 0.0, TAU, 20, Color(1.0, 0.5, 0.3, 0.6), 1.5)
+
+
+func m_overdrive() -> bool:
+	return overdrive > 0.0
 
 
 func _closed(p: PackedVector2Array) -> PackedVector2Array:

@@ -24,7 +24,7 @@ var revealed: float = 0.0
 var recovery_t: float = 0.0
 var size: float = 11.0
 
-const TRAIL_MAX := 10
+const TRAIL_MAX := 18
 
 
 func setup(k: String, pos: Vector2) -> void:
@@ -85,9 +85,9 @@ func hp_frac() -> float:
 
 
 func _draw() -> void:
-	var col := Color(1.0, 0.28, 0.18)
+	var col := Color(1.9, 0.26, 0.16)
 	if marked > 0.0:
-		col = Color(1.0, 0.55, 0.25)
+		col = Color(2.2, 0.9, 0.3)
 	if kind == "recovery":
 		col = Color(1.0, 0.72, 0.2)
 	elif kind == "ew":
@@ -99,9 +99,9 @@ func _draw() -> void:
 	if trail.size() >= 2:
 		for i in range(trail.size() - 1):
 			var t := 1.0 - float(i) / float(trail.size())
-			var a := t * t * 0.34
+			var a := t * t * 0.85
 			draw_line(trail[i] - position, trail[i + 1] - position,
-				Color(col.r, col.g, col.b, a), 2.6 * t + 0.5)
+				Color(col.r, col.g, col.b, a), 3.6 * t + 0.8)
 
 	var s := size
 	var ang := facing
@@ -110,17 +110,23 @@ func _draw() -> void:
 	var corners := [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]
 	for c in corners:
 		pts.append(Vector2(c.x, c.y).rotated(ang) * s)
-	var body := Color(col.r * 0.55, col.g * 0.45, col.b * 0.45, 0.9)
-	if flash > 0.0:
-		body = body.lerp(Color(1, 1, 1, 1), flash)
-	draw_colored_polygon(pts, body)
-	var edge := Color(col.r, col.g, col.b, 0.95)
-	if marked > 0.0:
-		edge = Color(1.0, 0.85, 0.4, 1.0)
-	draw_polyline(_closed(pts), edge, 1.7, true)
+	# 外发光（HDR 会吃 bloom）
+	draw_circle(Vector2.ZERO, s * 1.55, Color(1.5, 0.15, 0.08, 0.07))
+	draw_circle(Vector2.ZERO, s * 1.15, Color(1.8, 0.2, 0.1, 0.10))
 
-	# 内芯
-	draw_circle(Vector2.ZERO, s * 0.22, Color(edge.r, edge.g, edge.b, 0.8))
+	var body := Color(0.36, 0.04, 0.03, 1.0)
+	if flash > 0.0:
+		body = body.lerp(Color(1.6, 1.6, 1.6, 1.0), flash)
+	draw_colored_polygon(pts, body)
+	var edge := Color(col.r, col.g, col.b, 1.0)
+	if marked > 0.0:
+		edge = Color(2.6, 1.1, 0.35, 1.0)
+	draw_polyline(_closed(pts), edge, 2.2, true)
+	draw_polyline(_closed(pts), Color(edge.r * 1.6, edge.g * 1.4, edge.b * 1.3, 0.5), 0.9, true)
+
+	# 内芯（白热）
+	draw_circle(Vector2.ZERO, s * 0.26, Color(2.0, 1.5, 1.1, 0.9))
+	draw_circle(Vector2.ZERO, s * 0.13, Color(2.6, 2.4, 2.2, 1.0))
 
 	# 标记括线
 	if marked > 0.0:

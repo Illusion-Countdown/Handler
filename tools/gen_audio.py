@@ -91,8 +91,11 @@ def fade(x, ms=10):
 
 
 def save(name, x, peak=0.5):
-    x = normalize(np.tanh(x * 0.8), peak)
-    x = fade(x, 12)
+    # 统一柔化：低通 + 低峰值，去掉一切刺耳的高频和爆点
+    x = one_pole_lp(x, 2600)
+    x = one_pole_lp(x, 2600)
+    x = normalize(np.tanh(x * 0.55), min(peak, 0.30))
+    x = fade(x, 14)
     data = (x * 32767).astype(np.int16)
     path = os.path.join(OUT, name + ".wav")
     with wave.open(path, "wb") as w:

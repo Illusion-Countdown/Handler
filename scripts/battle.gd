@@ -128,6 +128,7 @@ func _build_terrain() -> void:
 					"rect": Rect2(bx, by, bw, bh),
 					"h": rng.randf_range(0.35, 1.0),
 				})
+				obstacles.append(Rect2(bx, by, bw, bh))
 		elif tp == "mountain":
 			for k in range(rng.randi_range(3, 6)):
 				var pts := PackedVector2Array()
@@ -148,6 +149,7 @@ func _build_terrain() -> void:
 					"h": rng.randf_range(0.2, 0.7),
 				})
 		terrain.append({"rect": r, "type": tp, "props": props})
+	_register_obstacles()
 
 
 func _build_fog() -> void:
@@ -217,6 +219,72 @@ func _lit_count() -> int:
 	return n
 
 
+func _register_obstacles() -> void:
+	obs_grid.clear()
+	for i in range(obstacles.size()):
+		var r: Rect2 = obstacles[i]
+		var x0 := int(r.position.x / OBS_CELL)
+		var x1 := int((r.position.x + r.size.x) / OBS_CELL)
+		var y0 := int(r.position.y / OBS_CELL)
+		var y1 := int((r.position.y + r.size.y) / OBS_CELL)
+		for yy in range(y0, y1 + 1):
+			for xx in range(x0, x1 + 1):
+				var k := Vector2i(xx, yy)
+				if not obs_grid.has(k):
+					obs_grid[k] = []
+				obs_grid[k].append(i)
+
+
+func resolve_obstacle(p: Vector2, rad: float) -> Vector2:
+	var k := Vector2i(int(p.x / OBS_CELL), int(p.y / OBS_CELL))
+	if not obs_grid.has(k):
+		return p
+	for idx in obs_grid[k]:
+		var r: Rect2 = obstacles[idx]
+		var cx: float = clamp(p.x, r.position.x, r.position.x + r.size.x)
+		var cy: float = clamp(p.y, r.position.y, r.position.y + r.size.y)
+		var d := p - Vector2(cx, cy)
+		var dl := d.length()
+		if dl < rad:
+			if dl < 0.01:
+				d = Vector2(0.0, -1.0)
+			p = Vector2(cx, cy) + d.normalized() * rad
+	return p
+
+
+func _separate(dt: float) -> void:
+	var alive_l: Array = []
+	for e in legions:
+		if not e.dead:
+			alive_l.append(e)
+	# 机体 vs 地形 / 军团
+	for m in mechs:
+		if m.dead:
+			continue
+		m.position = resolve_obstacle(m.position, 13.0)
+		for e in alive_l:
+			var dv: Vector2 = m.position - e.position
+			var dist := dv.length()
+			var mind: float = 15.0 + e.size * 0.6
+			if dist < mind and dist > 0.01:
+				var push := dv / dist * (mind - dist) * 0.55
+				m.position += push
+				e.position -= push
+	# 军团 vs 地形 / 军团
+	for i in range(alive_l.size()):
+		var a = alive_l[i]
+		a.position = resolve_obstacle(a.position, a.size * 0.85)
+		for j in range(i + 1, alive_l.size()):
+			var b = alive_l[j]
+			var d2: Vector2 = a.position - b.position
+			var dist2 := d2.length()
+			var mind2: float = (a.size + b.size) * 0.62
+			if dist2 < mind2 and dist2 > 0.01:
+				var push2 := d2 / dist2 * (mind2 - dist2) * 0.5
+				a.position += push2
+				b.position -= push2
+
+
 func map_center() -> Vector2:
 	return world_size * 0.5
 
@@ -242,7 +310,7 @@ func _spawn_wave(i: int) -> void:
 	var count := int(w["count"])
 	var bearings: Array = w.get("bearings", [0.0])
 	var center := map_center()
-	var radius: float = min(world_size.x, world_size.y) * 0.40
+	var radius: float = min(world_size.x, world_size.y) * 0.26
 	if wave_idx < 3:
 		_sfx("sfx_wave", 0.6, -6.0)
 		if String(w["type"]) == "armored" or String(w["type"]) == "shepherd":
@@ -294,6 +362,7 @@ func shadow_update(delta: float) -> void:
 		_update_squads(dt)
 		_update_legions(dt)
 		_update_combat(dt)
+		_separate(dt)
 		_update_recoveries(dt)
 		_update_fog(dt)
 		cp = min(10.0, cp)
@@ -322,28 +391,18 @@ func _update_orders(dt: float) -> void:
 func _apply_order(sq: Squad) -> void:
 	var od: Dictionary = sq.order
 	var er: float = float(od.get("exec", 0.6))
-	var ok: bool = randf() < er
+	# 指令一定执行；信任决定效果强度，而不是"听不听"
 	match String(od.get("cmd", "")):
 		"move":
-			var p: Vector2 = od["pos"]
-			if ok:
-				sq.dest = p
-			else:
-				sq.dest = sq.center.lerp(p, 0.45)
-				_push_hint("%s：命令执行偏差" % sq.label, 1.6)
+			sq.dest = od["pos"]
 			sq.has_dest = true
+			sq.formation_t = 6.0
+			_push_hint("%s：向目标推进" % sq.label, 0.9)
 		"focus":
 			var tg = od.get("target")
-			if ok:
-				sq.focus = tg
-			elif randf() < 0.5:
-				sq.focus = tg
-				_push_hint("%s：听到了，但没完全听懂" % sq.label, 1.6)
-			else:
-				_push_hint("%s：没有回应" % sq.label, 1.6)
-			# 集火命令同时转进攻
-			if sq.stance == "hold":
-				pass
+			sq.focus = tg
+			sq.focus_power = 1.30 + 0.35 * er
+			_push_hint("%s：锁定目标（伤害 ×%.2f）" % [sq.label, sq.focus_power], 1.2)
 
 
 func _update_waves(dt: float) -> void:
@@ -518,6 +577,8 @@ func _update_combat(dt: float) -> void:
 		var rng_px := float(m.stats["range"]) * GameData.CELL
 		if d <= rng_px and m.cd <= 0.0:
 			var aspd := float(m.stats["aspd"])
+			if m.squad != null and m.squad.formation_t > 0.0:
+				aspd *= 1.3
 			if m.overdrive > 0.0:
 				aspd *= 1.6
 			if m.squad != null and m.squad.resonance > 0.0:
@@ -569,6 +630,8 @@ func _mech_attack(m, e) -> void:
 	var dmg: float = m.base_atk()
 	if m.overdrive > 0.0:
 		dmg *= 1.5
+	if m.squad != null and e == m.squad.focus:
+		dmg *= m.squad.focus_power
 	if e.marked > 0.0:
 		dmg *= 1.4
 	if m.squad != null and m.squad.no_retreat_t > 0.0:
@@ -583,6 +646,7 @@ func _mech_attack(m, e) -> void:
 		m.crit_ready = false
 	e.take_damage(dmg)
 	m.damage_dealt += dmg
+	vfx.impact(e.position, Color(0.8, 0.98, 1.0) if e.marked <= 0.0 else Color(1.0, 0.9, 0.5), 1.0)
 	var marked_hit: bool = e.marked > 0.0
 	vfx.number(e.position + Vector2(randf_range(-8, 8), -e.size - 6), dmg,
 		Color(1.0, 0.85, 0.35) if marked_hit else Color(0.8, 0.95, 1.0), marked_hit)
@@ -592,7 +656,7 @@ func _mech_attack(m, e) -> void:
 		vfx.explosion(e.position, Color(1.0, 0.35, 0.2), 16.0 + e.size)
 		vfx.debris(e.position, Color(1.0, 0.5, 0.3), 7)
 		shake = max(shake, 0.10)
-		_sfx("sfx_explosion", 0.07, -4.0)
+		_sfx("sfx_explosion", 0.16, -11.0)
 		shake = max(shake, 0.22)
 	var aim: float = (e.position - m.position).angle()
 	match m.cfg_id:
@@ -619,7 +683,7 @@ func _mech_attack(m, e) -> void:
 		_:
 			vfx.tracer(m.position, e.position, Color(0.75, 0.95, 1.0), 0.07)
 			vfx.muzzle(m.position, aim, Color(0.75, 0.95, 1.0))
-	_sfx("sfx_rifle", 0.04, -9.0, 1.0)
+	_sfx("sfx_rifle", 0.10, -17.0, 1.0)
 	if m.cfg_id == "sniper":
 		vfx.tracer(m.position, e.position, Color(0.9, 1.0, 1.0), 0.12)
 	if m.cfg_id == "suppress":
@@ -654,7 +718,7 @@ func _legion_attack(e) -> void:
 		m.squad.on_member_hurt(dmg)
 	vfx.tracer(e.position, m.position, Color(1.0, 0.4, 0.25), 0.08)
 	vfx.muzzle(e.position, (m.position - e.position).angle(), Color(1.0, 0.45, 0.25))
-	_sfx("sfx_hit", 0.08, -11.0, 1.0)
+	_sfx("sfx_hit", 0.22, -20.0, 1.0)
 	if m.dead:
 		_on_mech_death(m)
 
@@ -858,8 +922,8 @@ func _on_right_click() -> void:
 	var radius_cells: float = max(4.0, 7.0 - dist_cells * 0.1)
 	fog.stamp_pulse(wp, radius_cells * GameData.CELL)
 	vfx.pulse(wp, radius_cells * GameData.CELL)
-	_sfx("sfx_scan", 0.15, -2.0)
-	_sfx("sfx_pulse", 0.15, -6.0, 1.1)
+	_sfx("sfx_scan", 0.15, -9.0)
+	_sfx("sfx_pulse", 0.15, -13.0, 1.1)
 	# 标记范围内敌人
 	for e in legions:
 		if e.dead:
@@ -880,7 +944,7 @@ func _issue_order(sq: Squad, data: Dictionary) -> void:
 	sq.feedback_t = 0.45
 	_apply_order(sq)
 	sq.order = {}
-	_sfx("sfx_command", 0.06, -2.0)
+	_sfx("sfx_command", 0.15, -8.0)
 
 
 func _resolve_orders() -> void:
@@ -1005,10 +1069,17 @@ func _push_hint(text: String, dur: float = 2.0) -> void:
 var _sfx_last: Dictionary = {}
 
 
+var _last_any: float = -99.0
+
+
 func _sfx(n: String, gap: float = 0.05, vol: float = -3.0, pitch: float = 1.0) -> void:
 	var now: float = Time.get_ticks_msec() / 1000.0
 	if now - float(_sfx_last.get(n, -99.0)) < gap:
 		return
+	# 全局节流：不管多少台开火，一秒最多 7 声
+	if now - _last_any < 0.14:
+		return
+	_last_any = now
 	_sfx_last[n] = now
 	var a = get_node_or_null("/root/Audio")
 	if a != null:
@@ -1050,6 +1121,9 @@ func _check_end() -> void:
 var _pending_res: Dictionary = {}
 var _over_t: float = 0.0
 var _manual_t: float = 0.0
+var obstacles: Array = []
+var obs_grid: Dictionary = {}
+const OBS_CELL := 96.0
 
 
 func _finish(win: bool) -> void:
@@ -1190,6 +1264,16 @@ func _draw_overlay() -> void:
 			overlay.draw_circle(sq.center, 26.0 * k, Color(0.25, 0.62, 0.85, 0.035))
 		# 方位提示
 		_draw_warning(sq)
+	# 集火锁定标记
+	for sq in squads:
+		if sq.focus == null or sq.focus.dead or not sq.focus.visible:
+			continue
+		var fp: Vector2 = sq.focus.position
+		var rf: float = 22.0 + sin(t * 6.0) * 3.0
+		for k in range(4):
+			var a0: float = k * PI * 0.5 + t * 1.4
+			overlay.draw_arc(fp, rf, a0, a0 + 0.5, 8, Color(1.0, 0.85, 0.35, 0.95), 2.4)
+		overlay.draw_arc(fp, rf + 5.0, 0.0, TAU, 24, Color(1.0, 0.85, 0.35, 0.25), 1.0)
 	# 回收标记
 	for c in recoveries:
 		if c["saved"] or c["taken"]:

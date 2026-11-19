@@ -63,27 +63,27 @@ const CONFIG_IDS := ["melee", "rifle", "sniper", "suppress", "heavy", "recon", "
 # ---------------- 军团 ----------------
 const LEGION := {
 	"infantry": {
-		"name": "步兵型", "hp": 60.0, "atk": 6.0, "aspd": 1.05, "range": 3.0,
+		"name": "步兵型", "hp": 26.0, "atk": 5.0, "aspd": 1.05, "range": 3.0,
 		"speed": 2.55, "armor": 0.0, "danger": 1.0, "size": 9.0,
 	},
 	"armored": {
-		"name": "装甲型", "hp": 150.0, "atk": 11.0, "aspd": 0.5, "range": 3.2,
+		"name": "装甲型", "hp": 85.0, "atk": 8.5, "aspd": 0.5, "range": 3.2,
 		"speed": 1.8, "armor": 0.32, "danger": 2.4, "size": 12.0, "charge": true,
 	},
 	"artillery": {
-		"name": "炮击型", "hp": 65.0, "atk": 18.0, "aspd": 0.3, "range": 9.0,
+		"name": "炮击型", "hp": 38.0, "atk": 13.0, "aspd": 0.3, "range": 9.0,
 		"speed": 0.85, "armor": 0.0, "danger": 3.2, "size": 11.0,
 	},
 	"ew": {
-		"name": "电子战型", "hp": 60.0, "atk": 4.0, "aspd": 1.0, "range": 4.0,
+		"name": "电子战型", "hp": 34.0, "atk": 3.0, "aspd": 1.0, "range": 4.0,
 		"speed": 1.5, "armor": 0.0, "danger": 1.6, "size": 10.0, "jam": true,
 	},
 	"recovery": {
-		"name": "回收型", "hp": 90.0, "atk": 0.0, "aspd": 1.0, "range": 1.0,
+		"name": "回收型", "hp": 55.0, "atk": 0.0, "aspd": 1.0, "range": 1.0,
 		"speed": 1.7, "armor": 0.1, "danger": 0.5, "size": 10.0, "recovery": true,
 	},
 	"shepherd": {
-		"name": "牧羊人", "hp": 340.0, "atk": 18.0, "aspd": 0.7, "range": 5.0,
+		"name": "牧羊人", "hp": 220.0, "atk": 14.0, "aspd": 0.7, "range": 5.0,
 		"speed": 1.45, "armor": 0.2, "danger": 5.0, "size": 16.0, "boss": true,
 	},
 }
@@ -227,18 +227,19 @@ const ENCOUNTERS := {
 	"skirmish": {
 		"name": "接触", "pressure": 0, "time_limit": 0.0,
 		"waves": [
-			{"type": "infantry", "count": 7, "delay": 1.2, "bearings": [0.0]},
-			{"type": "infantry", "count": 6, "delay": 9.0, "bearings": [2.3]},
-			{"type": "infantry", "count": 5, "delay": 18.0, "bearings": [4.2]},
+			{"type": "infantry", "count": 9, "delay": 1.0, "bearings": [0.0]},
+			{"type": "infantry", "count": 8, "delay": 7.0, "bearings": [2.3]},
+			{"type": "infantry", "count": 7, "delay": 13.0, "bearings": [4.2]},
+			{"type": "infantry", "count": 6, "delay": 19.0, "bearings": [5.4]},
 		],
 	},
 	"pincer": {
 		"name": "钳形", "pressure": 6, "time_limit": 0.0,
 		"waves": [
-			{"type": "infantry", "count": 7, "delay": 1.5, "bearings": [0.0]},
-			{"type": "infantry", "count": 7, "delay": 7.0, "bearings": [3.14]},
-			{"type": "armored", "count": 3, "delay": 17.0, "bearings": [1.4]},
-			{"type": "infantry", "count": 6, "delay": 24.0, "bearings": [4.6]},
+			{"type": "infantry", "count": 11, "delay": 1.0, "bearings": [0.0]},
+			{"type": "infantry", "count": 10, "delay": 6.0, "bearings": [3.14]},
+			{"type": "armored", "count": 4, "delay": 13.0, "bearings": [1.4]},
+			{"type": "infantry", "count": 9, "delay": 19.0, "bearings": [4.6]},
 		],
 	},
 	"outpost": {

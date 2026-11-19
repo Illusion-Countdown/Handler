@@ -178,6 +178,8 @@ func _move_squad(dt: float, battle) -> void:
 		facing = lerp_angle(facing, to.angle(), clamp(dt * 7.0, 0.0, 1.0))
 	center.x = clamp(center.x, 40.0, GameData.GRID_W * GameData.CELL - 40.0)
 	center.y = clamp(center.y, 40.0, GameData.GRID_H * GameData.CELL - 40.0)
+	if battle != null:
+		center = battle.resolve_obstacle(center, 36.0)
 
 
 func _update_members(dt: float) -> void:

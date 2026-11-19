@@ -105,51 +105,32 @@ func _build_layers() -> void:
 
 func _build_terrain() -> void:
 	terrain.clear()
-	var types := ["urban", "mountain", "plain", "ruin"]
-	for i in range(70):
-		var r := Rect2(
-			rng.randf_range(0.0, world_size.x - 260.0),
-			rng.randf_range(0.0, world_size.y - 260.0),
-			rng.randf_range(120.0, 320.0),
-			rng.randf_range(100.0, 240.0))
-		var tp: String = types[rng.randi() % types.size()]
-		if i < 3:
-			tp = "plain"
-		var props: Array = []
-		if tp == "urban":
-			# 一栋一栋的楼，带明暗面
-			for k in range(rng.randi_range(7, 16)):
-				var bw := rng.randf_range(22.0, 54.0)
-				var bh := rng.randf_range(20.0, 46.0)
-				var bx: float = r.position.x + rng.randf_range(8.0, max(8.0, r.size.x - bw - 8.0))
-				var by: float = r.position.y + rng.randf_range(8.0, max(8.0, r.size.y - bh - 8.0))
-				props.append({
-					"rect": Rect2(bx, by, bw, bh),
-					"h": rng.randf_range(0.35, 1.0),
-				})
-				obstacles.append(Rect2(bx, by, bw, bh))
-		elif tp == "mountain":
-			for k in range(rng.randi_range(3, 6)):
-				var pts := PackedVector2Array()
-				var x0: float = r.position.x + rng.randf_range(0.0, r.size.x * 0.4)
-				var y0: float = r.position.y + rng.randf_range(10.0, r.size.y - 10.0)
-				var seg := rng.randi_range(4, 7)
-				for s2 in range(seg):
-					pts.append(Vector2(x0 + s2 * rng.randf_range(18.0, 34.0), y0 + rng.randf_range(-26.0, 26.0)))
-				props.append({"pts": pts, "h": rng.randf_range(0.4, 1.0)})
-		elif tp == "ruin":
-			for k in range(rng.randi_range(5, 12)):
-				var sw := rng.randf_range(10.0, 30.0)
-				var sh := rng.randf_range(8.0, 22.0)
-				props.append({
-					"rect": Rect2(r.position.x + rng.randf_range(0.0, r.size.x - sw),
-						r.position.y + rng.randf_range(0.0, r.size.y - sh), sw, sh),
-					"rot": rng.randf_range(-0.5, 0.5),
-					"h": rng.randf_range(0.2, 0.7),
-				})
-		terrain.append({"rect": r, "type": tp, "props": props})
+	obstacles.clear()
+	var c := world_size * 0.5
+	var tries := 0
+	while terrain.size() < 26 and tries < 600:
+		tries += 1
+		var bw := rng.randf_range(70.0, 150.0)
+		var bh := rng.randf_range(56.0, 120.0)
+		var bx := rng.randf_range(90.0, world_size.x - bw - 90.0)
+		var by := rng.randf_range(90.0, world_size.y - bh - 90.0)
+		var r := Rect2(bx, by, bw, bh)
+		# 出生区留空，避免一开局就卡在楼里
+		var nx: float = clamp(c.x, r.position.x, r.position.x + r.size.x)
+		var ny: float = clamp(c.y, r.position.y, r.position.y + r.size.y)
+		if Vector2(nx, ny).distance_to(c) < 430.0:
+			continue
+		var bad := false
+		for t2 in terrain:
+			var rr: Rect2 = t2["rect"]
+			if r.grow(74.0).intersects(rr):
+				bad = true
+				break
+		if bad:
+			continue
+		terrain.append({"rect": r, "h": rng.randf_range(0.25, 1.0)})
+		obstacles.append(r)
 	_register_obstacles()
-
 
 func _build_fog() -> void:
 	fog = FogOfWar.new()
@@ -1196,65 +1177,23 @@ func _draw_world() -> void:
 			_hex(x, y, s * 0.94, col)
 			y += h * 2.0
 		x += s * 1.5
-	# 地形
+	# 城市：只有方块
 	for t in terrain:
-		var r: Rect2 = t["rect"]
-		var c := Color(0.22, 0.29, 0.38, 1.0)
-		match t["type"]:
-			"urban": c = Color(0.23, 0.28, 0.36, 1.0)
-			"mountain": c = Color(0.17, 0.27, 0.36, 1.0)
-			"ruin": c = Color(0.26, 0.21, 0.21, 1.0)
-		world_layer.draw_rect(r, c)
-		world_layer.draw_rect(r, Color(0.24, 0.42, 0.58, 0.55), false, 1.2)
-		match t["type"]:
-			"urban":
-				for p in t["props"]:
-					var br: Rect2 = p["rect"]
-					var hh: float = p["h"]
-					# 投影
-					world_layer.draw_rect(Rect2(br.position + Vector2(5, 6), br.size),
-						Color(0.03, 0.05, 0.08, 0.85))
-					# 侧面（暗）
-					world_layer.draw_rect(br, Color(0.14, 0.18, 0.24, 1.0))
-					# 顶面（亮）
-					var top := br.grow(-2.0)
-					var top_col := Color(0.30, 0.38, 0.48, 1.0).lerp(Color(0.46, 0.58, 0.70, 1.0), hh)
-					world_layer.draw_rect(top, top_col)
-					# 顶边高光
-					world_layer.draw_line(top.position, top.position + Vector2(top.size.x, 0),
-						Color(0.55, 0.78, 0.95, 0.55), 1.2)
-			"mountain":
-				for p in t["props"]:
-					var pts: PackedVector2Array = p["pts"]
-					if pts.size() < 2:
-						continue
-					# 山脊：底部阴影 + 顶线
-					var base_pts := PackedVector2Array()
-					for q in pts:
-						base_pts.append(q + Vector2(10, 12))
-					world_layer.draw_polyline(base_pts, Color(0.03, 0.05, 0.08, 0.6), 3.0)
-					world_layer.draw_polyline(pts, Color(0.30, 0.48, 0.62, 0.85), 2.0)
-					world_layer.draw_polyline(pts, Color(0.55, 0.8, 1.0, 0.35 * p["h"]), 1.0)
-			"ruin":
-				for p in t["props"]:
-					var br2: Rect2 = p["rect"]
-					var rot: float = p["rot"]
-					var cx := br2.position + br2.size * 0.5
-					var hw := br2.size.x * 0.5
-					var hh2 := br2.size.y * 0.5
-					var q := PackedVector2Array([
-						cx + Vector2(-hw, -hh2).rotated(rot),
-						cx + Vector2(hw, -hh2).rotated(rot),
-						cx + Vector2(hw, hh2).rotated(rot),
-						cx + Vector2(-hw, hh2).rotated(rot)])
-					world_layer.draw_colored_polygon(q, Color(0.13, 0.13, 0.15, 0.95))
-					var qc := PackedVector2Array(q)
-					qc.append(q[0])
-					world_layer.draw_polyline(qc, Color(0.42, 0.4, 0.4, 0.7), 1.2)
-			"plain":
-				for p in t["props"]:
-					pass
-	# 边界
+		var br: Rect2 = t["rect"]
+		var hh: float = t["h"]
+		# 投影
+		world_layer.draw_rect(Rect2(br.position + Vector2(7, 8), br.size), Color(0.025, 0.04, 0.06, 0.95))
+		# 楼体
+		world_layer.draw_rect(br, Color(0.13, 0.17, 0.23, 1.0))
+		# 顶面（高度决定亮度）
+		var top: Rect2 = br.grow(-2.5)
+		var tc := Color(0.26, 0.34, 0.44, 1.0).lerp(Color(0.46, 0.58, 0.70, 1.0), hh)
+		world_layer.draw_rect(top, tc)
+		# 顶边高光
+		world_layer.draw_line(top.position, top.position + Vector2(top.size.x, 0.0),
+			Color(0.52, 0.74, 0.92, 0.55), 1.2)
+		world_layer.draw_line(top.position, top.position + Vector2(0.0, top.size.y),
+			Color(0.40, 0.58, 0.74, 0.35), 1.0)	# 边界
 	world_layer.draw_rect(Rect2(Vector2.ZERO, ws), Color(0.16, 0.4, 0.55, 0.5), false, 2.0)
 
 

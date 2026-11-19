@@ -114,7 +114,7 @@ func tick(dt: float) -> void:
 			if pulsed[i] > 0.0:
 				pulsed[i] = max(0.0, pulsed[i] - d)
 	_acc += dt
-	if _acc >= 0.14:
+	if _acc >= 0.18:
 		_acc = 0.0
 		_rebuild()
 

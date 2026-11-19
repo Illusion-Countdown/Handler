@@ -14,6 +14,8 @@ func _ready() -> void:
 	font.font_names = PackedStringArray([
 		"Microsoft YaHei UI", "Microsoft YaHei", "SimHei",
 		"Noto Sans CJK SC", "PingFang SC", "sans-serif"])
+	if not ("windowed" in OS.get_cmdline_user_args()):
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
 	G.new_run()
 	fx = ScreenFX.new()
 	add_child(fx)
@@ -270,6 +272,13 @@ func _draw_title(c: Control) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_F11:
+			var m := DisplayServer.window_get_mode()
+			if m == DisplayServer.WINDOW_MODE_FULLSCREEN:
+				DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+			else:
+				DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+			return
 		if event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER:
 			if battle == null and (campaign == null or campaign.mode == "map"):
 				_start_campaign()

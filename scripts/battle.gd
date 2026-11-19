@@ -107,16 +107,47 @@ func _build_layers() -> void:
 func _build_terrain() -> void:
 	terrain.clear()
 	var types := ["urban", "mountain", "plain", "ruin"]
-	for i in range(44):
+	for i in range(70):
 		var r := Rect2(
-			rng.randf_range(0.0, world_size.x - 220.0),
-			rng.randf_range(0.0, world_size.y - 220.0),
-			rng.randf_range(90.0, 260.0),
-			rng.randf_range(70.0, 200.0))
+			rng.randf_range(0.0, world_size.x - 260.0),
+			rng.randf_range(0.0, world_size.y - 260.0),
+			rng.randf_range(120.0, 320.0),
+			rng.randf_range(100.0, 240.0))
 		var tp: String = types[rng.randi() % types.size()]
 		if i < 3:
 			tp = "plain"
-		terrain.append({"rect": r, "type": tp})
+		var props: Array = []
+		if tp == "urban":
+			# 一栋一栋的楼，带明暗面
+			for k in range(rng.randi_range(7, 16)):
+				var bw := rng.randf_range(22.0, 54.0)
+				var bh := rng.randf_range(20.0, 46.0)
+				var bx: float = r.position.x + rng.randf_range(8.0, max(8.0, r.size.x - bw - 8.0))
+				var by: float = r.position.y + rng.randf_range(8.0, max(8.0, r.size.y - bh - 8.0))
+				props.append({
+					"rect": Rect2(bx, by, bw, bh),
+					"h": rng.randf_range(0.35, 1.0),
+				})
+		elif tp == "mountain":
+			for k in range(rng.randi_range(3, 6)):
+				var pts := PackedVector2Array()
+				var x0: float = r.position.x + rng.randf_range(0.0, r.size.x * 0.4)
+				var y0: float = r.position.y + rng.randf_range(10.0, r.size.y - 10.0)
+				var seg := rng.randi_range(4, 7)
+				for s2 in range(seg):
+					pts.append(Vector2(x0 + s2 * rng.randf_range(18.0, 34.0), y0 + rng.randf_range(-26.0, 26.0)))
+				props.append({"pts": pts, "h": rng.randf_range(0.4, 1.0)})
+		elif tp == "ruin":
+			for k in range(rng.randi_range(5, 12)):
+				var sw := rng.randf_range(10.0, 30.0)
+				var sh := rng.randf_range(8.0, 22.0)
+				props.append({
+					"rect": Rect2(r.position.x + rng.randf_range(0.0, r.size.x - sw),
+						r.position.y + rng.randf_range(0.0, r.size.y - sh), sw, sh),
+					"rot": rng.randf_range(-0.5, 0.5),
+					"h": rng.randf_range(0.2, 0.7),
+				})
+		terrain.append({"rect": r, "type": tp, "props": props})
 
 
 func _build_fog() -> void:
@@ -129,13 +160,15 @@ func _build_fog() -> void:
 func _build_camera() -> void:
 	cam = Camera2D.new()
 	cam.position = world_size * 0.5
-	cam.zoom = Vector2(1.9, 1.9)
+	cam.zoom = Vector2(2.4, 2.4)
 	cam.limit_left = 0
 	cam.limit_top = 0
 	cam.limit_right = int(world_size.x)
 	cam.limit_bottom = int(world_size.y)
 	add_child(cam)
 	cam.make_current()
+	if squads.size() > 0:
+		cam.position = squads[0].center
 
 
 func _build_squads() -> void:
@@ -174,6 +207,14 @@ func _pick_config(m: Dictionary) -> String:
 	if m.has("config") and m["config"] != "":
 		return m["config"]
 	return GameData.CONFIG_IDS[rng.randi() % GameData.CONFIG_IDS.size()]
+
+
+func _lit_count() -> int:
+	var n := 0
+	for v in fog.visible_bits:
+		if v == 1:
+			n += 1
+	return n
 
 
 func map_center() -> Vector2:
@@ -549,13 +590,36 @@ func _mech_attack(m, e) -> void:
 		m.kills += 1
 		G.total_kills += 1
 		vfx.explosion(e.position, Color(1.0, 0.35, 0.2), 16.0 + e.size)
+		vfx.debris(e.position, Color(1.0, 0.5, 0.3), 7)
+		shake = max(shake, 0.10)
 		_sfx("sfx_explosion", 0.07, -4.0)
 		shake = max(shake, 0.22)
-	vfx.tracer(m.position, e.position, Color(0.75, 0.95, 1.0), 0.07)
-	if m.cfg_id == "sniper" or m.cfg_id == "suppress":
-		_sfx("sfx_rifle", 0.05, -9.0, 0.72)
-	else:
-		_sfx("sfx_rifle", 0.04, -9.0, 1.0)
+	var aim: float = (e.position - m.position).angle()
+	match m.cfg_id:
+		"melee":
+			vfx.slash(m.position.lerp(e.position, 0.5), aim, 26.0, Color(0.75, 0.98, 1.0))
+			vfx.explosion(e.position, Color(0.7, 0.95, 1.0), 14.0)
+			shake = max(shake, 0.07)
+		"sniper":
+			vfx.beam(m.position, e.position, Color(0.85, 1.0, 1.0), 2.4)
+			vfx.muzzle(m.position, aim, Color(0.85, 1.0, 1.0))
+			shake = max(shake, 0.05)
+		"suppress":
+			for q in range(3):
+				var off := Vector2.RIGHT.rotated(aim).normalized() * 0.0 + Vector2(randf_range(-4, 4), randf_range(-4, 4))
+				vfx.tracer(m.position + off, e.position + off, Color(1.0, 0.85, 0.5), 0.05)
+			vfx.muzzle(m.position, aim, Color(1.0, 0.85, 0.5))
+		"heavy":
+			vfx.tracer(m.position, e.position, Color(1.0, 0.7, 0.4), 0.10)
+			vfx.muzzle(m.position, aim, Color(1.0, 0.7, 0.4))
+			vfx.debris(e.position, Color(1.0, 0.55, 0.3), 4)
+			shake = max(shake, 0.10)
+		"ew":
+			vfx.ripple(e.position, Color(0.6, 0.5, 1.0), 30.0)
+		_:
+			vfx.tracer(m.position, e.position, Color(0.75, 0.95, 1.0), 0.07)
+			vfx.muzzle(m.position, aim, Color(0.75, 0.95, 1.0))
+	_sfx("sfx_rifle", 0.04, -9.0, 1.0)
 	if m.cfg_id == "sniper":
 		vfx.tracer(m.position, e.position, Color(0.9, 1.0, 1.0), 0.12)
 	if m.cfg_id == "suppress":
@@ -589,6 +653,7 @@ func _legion_attack(e) -> void:
 	if m.squad != null:
 		m.squad.on_member_hurt(dmg)
 	vfx.tracer(e.position, m.position, Color(1.0, 0.4, 0.25), 0.08)
+	vfx.muzzle(e.position, (m.position - e.position).angle(), Color(1.0, 0.45, 0.25))
 	_sfx("sfx_hit", 0.08, -11.0, 1.0)
 	if m.dead:
 		_on_mech_death(m)
@@ -685,6 +750,11 @@ func _handle_camera(delta: float) -> void:
 	if Input.is_key_pressed(KEY_S): dir.y += 1
 	if dir.length() > 0.0:
 		cam.position += dir.normalized() * 900.0 * delta / cam.zoom.x
+		_manual_t = 0.0
+	else:
+		_manual_t += delta
+		if _manual_t > 0.7 and selected != null:
+			cam.position = cam.position.lerp(selected.center, clamp(delta * 2.4, 0.0, 1.0))
 	cam.position.x = clamp(cam.position.x, 0.0, world_size.x)
 	cam.position.y = clamp(cam.position.y, 0.0, world_size.y)
 	if shake > 0.0:
@@ -722,6 +792,9 @@ func _unhandled_input(event: InputEvent) -> void:
 					_push_hint("交战规则：%s" % GameData.ROE_NAME[selected.roe], 1.0)
 			KEY_R:
 				_recover(selected)
+			KEY_C:
+				if selected != null:
+					cam.position = selected.center
 			KEY_TAB:
 				if squads.size() > 1:
 					var i := (squads.find(selected) + 1) % squads.size()
@@ -976,6 +1049,7 @@ func _check_end() -> void:
 
 var _pending_res: Dictionary = {}
 var _over_t: float = 0.0
+var _manual_t: float = 0.0
 
 
 func _finish(win: bool) -> void:
@@ -1029,23 +1103,59 @@ func _draw_world() -> void:
 		var r: Rect2 = t["rect"]
 		var c := Color(0.16, 0.21, 0.28, 0.95)
 		match t["type"]:
-			"urban": c = Color(0.20, 0.23, 0.30, 1.0)
-			"mountain": c = Color(0.14, 0.22, 0.30, 1.0)
-			"ruin": c = Color(0.22, 0.17, 0.16, 1.0)
+			"urban": c = Color(0.17, 0.20, 0.26, 1.0)
+			"mountain": c = Color(0.12, 0.19, 0.26, 1.0)
+			"ruin": c = Color(0.19, 0.15, 0.15, 1.0)
 		world_layer.draw_rect(r, c)
-		world_layer.draw_rect(r, Color(0.26, 0.46, 0.62, 0.7), false, 1.4)
-		if t["type"] == "urban":
-			var step := 26.0
-			var gx := r.position.x
-			while gx < r.position.x + r.size.x:
-				world_layer.draw_line(Vector2(gx, r.position.y), Vector2(gx, r.position.y + r.size.y),
-					Color(0.1, 0.13, 0.17, 0.35), 1.0)
-				gx += step
-			var gy := r.position.y
-			while gy < r.position.y + r.size.y:
-				world_layer.draw_line(Vector2(r.position.x, gy), Vector2(r.position.x + r.size.x, gy),
-					Color(0.1, 0.13, 0.17, 0.35), 1.0)
-				gy += step
+		world_layer.draw_rect(r, Color(0.24, 0.42, 0.58, 0.55), false, 1.2)
+		match t["type"]:
+			"urban":
+				for p in t["props"]:
+					var br: Rect2 = p["rect"]
+					var hh: float = p["h"]
+					# 投影
+					world_layer.draw_rect(Rect2(br.position + Vector2(5, 6), br.size),
+						Color(0.03, 0.05, 0.08, 0.85))
+					# 侧面（暗）
+					world_layer.draw_rect(br, Color(0.10, 0.13, 0.18, 1.0))
+					# 顶面（亮）
+					var top := br.grow(-2.0)
+					var top_col := Color(0.22, 0.28, 0.36, 1.0).lerp(Color(0.34, 0.44, 0.55, 1.0), hh)
+					world_layer.draw_rect(top, top_col)
+					# 顶边高光
+					world_layer.draw_line(top.position, top.position + Vector2(top.size.x, 0),
+						Color(0.55, 0.78, 0.95, 0.55), 1.2)
+			"mountain":
+				for p in t["props"]:
+					var pts: PackedVector2Array = p["pts"]
+					if pts.size() < 2:
+						continue
+					# 山脊：底部阴影 + 顶线
+					var base_pts := PackedVector2Array()
+					for q in pts:
+						base_pts.append(q + Vector2(10, 12))
+					world_layer.draw_polyline(base_pts, Color(0.03, 0.05, 0.08, 0.6), 3.0)
+					world_layer.draw_polyline(pts, Color(0.30, 0.48, 0.62, 0.85), 2.0)
+					world_layer.draw_polyline(pts, Color(0.55, 0.8, 1.0, 0.35 * p["h"]), 1.0)
+			"ruin":
+				for p in t["props"]:
+					var br2: Rect2 = p["rect"]
+					var rot: float = p["rot"]
+					var cx := br2.position + br2.size * 0.5
+					var hw := br2.size.x * 0.5
+					var hh2 := br2.size.y * 0.5
+					var q := PackedVector2Array([
+						cx + Vector2(-hw, -hh2).rotated(rot),
+						cx + Vector2(hw, -hh2).rotated(rot),
+						cx + Vector2(hw, hh2).rotated(rot),
+						cx + Vector2(-hw, hh2).rotated(rot)])
+					world_layer.draw_colored_polygon(q, Color(0.13, 0.13, 0.15, 0.95))
+					var qc := PackedVector2Array(q)
+					qc.append(q[0])
+					world_layer.draw_polyline(qc, Color(0.42, 0.4, 0.4, 0.7), 1.2)
+			"plain":
+				for p in t["props"]:
+					pass
 	# 边界
 	world_layer.draw_rect(Rect2(Vector2.ZERO, ws), Color(0.16, 0.4, 0.55, 0.5), false, 2.0)
 

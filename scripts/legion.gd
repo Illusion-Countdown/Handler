@@ -85,7 +85,7 @@ func hp_frac() -> float:
 
 
 func _draw() -> void:
-	var col := Color(1.9, 0.26, 0.16)
+	var col := Color(1.15, 0.20, 0.13)
 	if marked > 0.0:
 		col = Color(2.2, 0.9, 0.3)
 	if kind == "recovery":
@@ -99,9 +99,9 @@ func _draw() -> void:
 	if trail.size() >= 2:
 		for i in range(trail.size() - 1):
 			var t := 1.0 - float(i) / float(trail.size())
-			var a := t * t * 0.85
+			var a := t * t * 0.42
 			draw_line(trail[i] - position, trail[i + 1] - position,
-				Color(col.r, col.g, col.b, a), 3.6 * t + 0.8)
+				Color(col.r, col.g, col.b, a), 2.8 * t + 0.6)
 
 	var s := size
 	var ang := facing
@@ -111,8 +111,8 @@ func _draw() -> void:
 	for c in corners:
 		pts.append(Vector2(c.x, c.y).rotated(ang) * s)
 	# 外发光（HDR 会吃 bloom）
-	draw_circle(Vector2.ZERO, s * 1.55, Color(1.5, 0.15, 0.08, 0.07))
-	draw_circle(Vector2.ZERO, s * 1.15, Color(1.8, 0.2, 0.1, 0.10))
+	draw_circle(Vector2.ZERO, s * 1.45, Color(1.1, 0.12, 0.07, 0.045))
+	draw_circle(Vector2.ZERO, s * 1.1, Color(1.2, 0.15, 0.08, 0.06))
 
 	var body := Color(0.36, 0.04, 0.03, 1.0)
 	if flash > 0.0:
@@ -122,11 +122,11 @@ func _draw() -> void:
 	if marked > 0.0:
 		edge = Color(2.6, 1.1, 0.35, 1.0)
 	draw_polyline(_closed(pts), edge, 2.2, true)
-	draw_polyline(_closed(pts), Color(edge.r * 1.6, edge.g * 1.4, edge.b * 1.3, 0.5), 0.9, true)
+	draw_polyline(_closed(pts), Color(edge.r * 1.15, edge.g * 1.1, edge.b * 1.05, 0.35), 0.8, true)
 
 	# 内芯（白热）
-	draw_circle(Vector2.ZERO, s * 0.26, Color(2.0, 1.5, 1.1, 0.9))
-	draw_circle(Vector2.ZERO, s * 0.13, Color(2.6, 2.4, 2.2, 1.0))
+	draw_circle(Vector2.ZERO, s * 0.24, Color(1.35, 1.0, 0.75, 0.85))
+	draw_circle(Vector2.ZERO, s * 0.12, Color(1.7, 1.6, 1.45, 0.95))
 
 	# 标记括线
 	if marked > 0.0:

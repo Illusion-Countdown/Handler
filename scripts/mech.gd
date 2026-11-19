@@ -95,15 +95,15 @@ func _draw() -> void:
 			var a := t * t * 0.95
 			var w := 3.4 * t + 0.7
 			draw_line(trail[i] - position, trail[i + 1] - position,
-				Color(col.r * 1.5, col.g * 1.9, col.b * 2.1, a), w)
+				Color(col.r * 1.05, col.g * 1.35, col.b * 1.5, a * 0.55), w)
 		# 白热芯
 		draw_line(trail[0] - position, trail[1] - position,
-			Color(2.6, 3.2, 3.6, 0.9), 2.0)
+			Color(1.6, 2.0, 2.3, 0.5), 1.6)
 	# 引擎光
-	draw_circle(Vector2.ZERO, 22.0, Color(col.r * 0.9, col.g * 1.6, col.b * 2.0, 0.10))
-	draw_circle(Vector2.ZERO, 14.0, Color(col.r * 1.2, col.g * 2.0, col.b * 2.6, 0.16))
+	draw_circle(Vector2.ZERO, 20.0, Color(col.r * 0.7, col.g * 1.1, col.b * 1.3, 0.045))
+	draw_circle(Vector2.ZERO, 13.0, Color(col.r * 0.9, col.g * 1.4, col.b * 1.7, 0.07))
 	if not dead:
-		draw_arc(Vector2.ZERO, 13.0, 0.0, TAU, 20, Color(col.r * 2.0, col.g * 2.6, col.b * 3.0, 0.45), 1.4)
+		draw_arc(Vector2.ZERO, 13.0, 0.0, TAU, 20, Color(col.r * 1.2, col.g * 1.5, col.b * 1.7, 0.28), 1.2)
 	# 三角
 	var s := 12.0
 	var pts := PackedVector2Array()
@@ -119,9 +119,9 @@ func _draw() -> void:
 	if stagger > 0.0:
 		body = body.lerp(Color(1.6, 0.5, 0.3, 1.0), 0.6)
 	draw_colored_polygon(pts, body)
-	draw_polyline(_closed(pts), Color(col.r * 2.2, col.g * 2.6, col.b * 3.0, 1.0), 2.0, true)
+	draw_polyline(_closed(pts), Color(col.r * 1.45, col.g * 1.7, col.b * 1.9, 1.0), 1.8, true)
 	# 白热芯
-	draw_circle(Vector2.ZERO, 2.6, Color(3.0, 3.4, 3.8, 1.0))
+	draw_circle(Vector2.ZERO, 2.2, Color(1.8, 2.0, 2.2, 1.0))
 	# 血量条
 	var w := 26.0
 	var f := hp_frac()

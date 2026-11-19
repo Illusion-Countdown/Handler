@@ -81,13 +81,12 @@ func _build_layers() -> void:
 	var env := Environment.new()
 	env.background_mode = Environment.BG_CANVAS
 	env.glow_enabled = true
-	env.glow_intensity = 1.35
-	env.glow_strength = 1.15
-	env.glow_bloom = 0.22
+	env.glow_intensity = 0.55
+	env.glow_strength = 0.7
+	env.glow_bloom = 0.0
 	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_ADDITIVE
-	env.glow_hdr_threshold = 0.55
-	env.glow_hdr_scale = 2.2
-	env.glow_bloom = 0.15
+	env.glow_hdr_threshold = 1.05
+	env.glow_hdr_scale = 1.6
 	env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
 	we.environment = env
 	add_child(we)
@@ -705,7 +704,7 @@ func _legion_attack(e) -> void:
 			m.squad.integrity -= 8.0
 		vfx.flash(Color(1.0, 0.3, 0.2, 0.5), 0.12)
 		_push_hint("被偷袭", 1.2)
-		_fx_flash(0.30, Color(1.0, 0.2, 0.15))
+		_fx_flash(0.10, Color(1.0, 0.25, 0.2))
 		e.seen = 0.01
 	# 断后承伤
 	if m.squad != null and m.squad.absorb_t > 0.0:
@@ -749,7 +748,7 @@ func _shockwave(e) -> void:
 
 func _on_mech_death(m) -> void:
 	deaths.append(m)
-	_fx_flash(0.45, Color(0.5, 0.85, 1.0))
+	_fx_flash(0.14, Color(0.55, 0.85, 1.0))
 	_sfx("sfx_death_signal", 0.4, -2.0)
 	_sfx("sfx_explosion_big", 0.3, -4.0)
 	vfx.explosion(m.position, Color(0.6, 0.9, 1.0), 26.0)
@@ -1175,11 +1174,11 @@ func _draw_world() -> void:
 	# 地形
 	for t in terrain:
 		var r: Rect2 = t["rect"]
-		var c := Color(0.16, 0.21, 0.28, 0.95)
+		var c := Color(0.22, 0.29, 0.38, 1.0)
 		match t["type"]:
-			"urban": c = Color(0.17, 0.20, 0.26, 1.0)
-			"mountain": c = Color(0.12, 0.19, 0.26, 1.0)
-			"ruin": c = Color(0.19, 0.15, 0.15, 1.0)
+			"urban": c = Color(0.23, 0.28, 0.36, 1.0)
+			"mountain": c = Color(0.17, 0.27, 0.36, 1.0)
+			"ruin": c = Color(0.26, 0.21, 0.21, 1.0)
 		world_layer.draw_rect(r, c)
 		world_layer.draw_rect(r, Color(0.24, 0.42, 0.58, 0.55), false, 1.2)
 		match t["type"]:
@@ -1191,10 +1190,10 @@ func _draw_world() -> void:
 					world_layer.draw_rect(Rect2(br.position + Vector2(5, 6), br.size),
 						Color(0.03, 0.05, 0.08, 0.85))
 					# 侧面（暗）
-					world_layer.draw_rect(br, Color(0.10, 0.13, 0.18, 1.0))
+					world_layer.draw_rect(br, Color(0.14, 0.18, 0.24, 1.0))
 					# 顶面（亮）
 					var top := br.grow(-2.0)
-					var top_col := Color(0.22, 0.28, 0.36, 1.0).lerp(Color(0.34, 0.44, 0.55, 1.0), hh)
+					var top_col := Color(0.30, 0.38, 0.48, 1.0).lerp(Color(0.46, 0.58, 0.70, 1.0), hh)
 					world_layer.draw_rect(top, top_col)
 					# 顶边高光
 					world_layer.draw_line(top.position, top.position + Vector2(top.size.x, 0),

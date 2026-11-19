@@ -129,12 +129,12 @@ func _rebuild() -> void:
 		if visible_bits[i] == 1 or pulsed[i] > 0.0:
 			a = 0.0
 		elif remembered[i] > 0.0:
-			a = 1.0 - 0.66 * clamp(remembered[i] / MEM_FADE, 0.0, 1.0)
+			a = 1.0 - 0.45 * clamp(remembered[i] / MEM_FADE, 0.0, 1.0)
 		var o: int = i * 4
 		data[o] = 1
 		data[o + 1] = 2
 		data[o + 2] = 5
-		data[o + 3] = int(clamp(a * 0.93, 0.0, 1.0) * 255.0)
+		data[o + 3] = int(clamp(a, 0.0, 1.0) * 255.0)
 	# 3x3 盒式模糊（只在字节数组上做，一次）
 	var src := data.duplicate()
 	for y in range(1, gh - 1):

@@ -588,8 +588,6 @@ func _legion_attack(e) -> void:
 	m.take_damage(dmg)
 	if m.squad != null:
 		m.squad.on_member_hurt(dmg)
-		m.squad.facing = lerp_angle(m.squad.facing,
-			(e.position - m.squad.center).angle(), 0.7)
 	vfx.tracer(e.position, m.position, Color(1.0, 0.4, 0.25), 0.08)
 	_sfx("sfx_hit", 0.08, -11.0, 1.0)
 	if m.dead:

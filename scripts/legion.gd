@@ -39,7 +39,7 @@ func setup(k: String, pos: Vector2) -> void:
 
 
 func speed_px() -> float:
-	var s := float(stats["speed"]) * GameData.CELL
+	var s := float(stats["speed"]) * GameData.CELL * GameData.MOVE_SCALE
 	if slow > 0.0:
 		s *= 0.6
 	return s

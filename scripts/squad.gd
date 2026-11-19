@@ -149,34 +149,22 @@ func _nearest_enemy(battle):
 
 
 func _move_squad(dt: float, battle) -> void:
-	var spd := 2.35 * GameData.CELL
+	var spd := 2.35 * GameData.CELL * GameData.MOVE_SCALE
 	if silence_t > 0.0:
 		spd *= 0.7
 	var tgt := center
-	var e = _nearest_enemy(battle)
-	match stance:
-		"attack":
-			if e != null:
-				tgt = e.position
-				if center.distance_to(e.position) < 82.0:
-					tgt = center
-			elif has_dest:
-				tgt = dest
-		"hold":
-			tgt = dest if has_dest else center
-		"maneuver":
-			if e != null:
-				var away: Vector2 = (center - e.position).normalized()
-				if center.distance_to(e.position) < 260.0:
-					tgt = center + away * 60.0
-				else:
-					tgt = center
-			elif has_dest:
-				tgt = dest
-			else:
-				tgt = center
-		"withdraw":
-			tgt = dest if has_dest else _retreat_point(battle)
+	# 移动完全由玩家点击决定：不再自动冲向敌人
+	if has_dest:
+		tgt = dest
+		if center.distance_to(dest) < 8.0:
+			has_dest = false
+			tgt = center
+	elif stance == "withdraw" and not broken:
+		tgt = _retreat_point(battle)
+	elif stance == "maneuver":
+		var e = _nearest_enemy(battle)
+		if e != null and center.distance_to(e.position) < 240.0:
+			tgt = center + (center - e.position).normalized() * 55.0
 
 	var to := tgt - center
 	if to.length() > 4.0:
@@ -184,7 +172,7 @@ func _move_squad(dt: float, battle) -> void:
 		if step.length() > to.length():
 			step = to
 		center += step
-		facing = lerp_angle(facing, to.angle(), clamp(dt * 3.0, 0.0, 1.0))
+		facing = lerp_angle(facing, to.angle(), clamp(dt * 7.0, 0.0, 1.0))
 	center.x = clamp(center.x, 40.0, GameData.GRID_W * GameData.CELL - 40.0)
 	center.y = clamp(center.y, 40.0, GameData.GRID_H * GameData.CELL - 40.0)
 
@@ -208,13 +196,11 @@ func _update_members(dt: float) -> void:
 			want = m.position + (base - m.position).normalized() * 40.0
 		var to: Vector2 = want - m.position
 		if to.length() > 3.0:
-			var mv: Vector2 = to.normalized() * min(float(m.stats["speed"]) * GameData.CELL * 1.15, speed) * dt
+			var mv: Vector2 = to.normalized() * min(float(m.stats["speed"]) * GameData.CELL * GameData.MOVE_SCALE * 1.15, speed) * dt
 			if mv.length() > to.length():
 				mv = to
 			m.position += mv
-			m.facing = lerp_angle(m.facing, mv.angle(), clamp(dt * 6.0, 0.0, 1.0))
-		else:
-			m.facing = lerp_angle(m.facing, facing, clamp(dt * 3.0, 0.0, 1.0))
+		m.facing = lerp_angle(m.facing, facing, clamp(dt * 8.0, 0.0, 1.0))
 		m.position.x = clamp(m.position.x, 24.0, GameData.GRID_W * GameData.CELL - 24.0)
 		m.position.y = clamp(m.position.y, 24.0, GameData.GRID_H * GameData.CELL - 24.0)
 

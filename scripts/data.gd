@@ -5,6 +5,7 @@ extends Node
 
 # ---------------- 基础 ----------------
 const CELL := 32.0
+const MOVE_SCALE := 0.60      # 全局移动速度系数（手感总开关）
 const GRID_W := 80
 const GRID_H := 56
 

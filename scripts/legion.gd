@@ -20,6 +20,7 @@ var charge_cd: float = 6.0
 var seen: float = 0.0            # 最近一次被我方看见的时间戳
 var slow: float = 0.0
 var jam_t: float = 0.0
+var revealed: float = 0.0
 var recovery_t: float = 0.0
 var size: float = 11.0
 
@@ -57,6 +58,7 @@ func update_visual(dt: float) -> void:
 	marked = max(0.0, marked - dt)
 	exposed = max(0.0, exposed - dt)
 	slow = max(0.0, slow - dt)
+	revealed = max(0.0, revealed - dt)
 	if trail.is_empty() or trail[0].distance_to(position) > 6.0:
 		trail.push_front(position)
 		if trail.size() > TRAIL_MAX:

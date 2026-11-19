@@ -5,12 +5,12 @@ extends Node
 
 # ---------------- 基础 ----------------
 const CELL := 32.0
-const GRID_W := 56
-const GRID_H := 40
+const GRID_W := 80
+const GRID_H := 56
 
 const MECH_BASE := {
 	"hp": 190.0, "atk": 13.0, "aspd": 1.0, "range": 3.8,
-	"speed": 2.2, "armor": 0.30, "vision": 6.0, "vision_angle": 140.0, "scout": 2.0,
+	"speed": 2.2, "armor": 0.30, "vision": 4.5, "vision_angle": 120.0, "scout": 2.0,
 }
 
 # ---------------- 机体配置 ----------------
@@ -226,16 +226,18 @@ const ENCOUNTERS := {
 	"skirmish": {
 		"name": "接触", "pressure": 0, "time_limit": 0.0,
 		"waves": [
-			{"type": "infantry", "count": 3, "delay": 1.5, "bearings": [0.0]},
-			{"type": "infantry", "count": 2, "delay": 16.0, "bearings": [1.4]},
+			{"type": "infantry", "count": 5, "delay": 1.2, "bearings": [0.0]},
+			{"type": "infantry", "count": 4, "delay": 10.0, "bearings": [2.3]},
+			{"type": "infantry", "count": 3, "delay": 20.0, "bearings": [4.2]},
 		],
 	},
 	"pincer": {
 		"name": "钳形", "pressure": 6, "time_limit": 0.0,
 		"waves": [
-			{"type": "infantry", "count": 4, "delay": 2.0, "bearings": [0.0]},
-			{"type": "infantry", "count": 3, "delay": 9.0, "bearings": [3.14]},
-			{"type": "armored", "count": 1, "delay": 22.0, "bearings": [1.2]},
+			{"type": "infantry", "count": 5, "delay": 1.5, "bearings": [0.0]},
+			{"type": "infantry", "count": 5, "delay": 7.0, "bearings": [3.14]},
+			{"type": "armored", "count": 2, "delay": 18.0, "bearings": [1.4]},
+			{"type": "infantry", "count": 4, "delay": 26.0, "bearings": [4.6]},
 		],
 	},
 	"outpost": {

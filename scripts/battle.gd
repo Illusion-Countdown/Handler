@@ -107,7 +107,7 @@ func _build_layers() -> void:
 func _build_terrain() -> void:
 	terrain.clear()
 	var types := ["urban", "mountain", "plain", "ruin"]
-	for i in range(26):
+	for i in range(44):
 		var r := Rect2(
 			rng.randf_range(0.0, world_size.x - 220.0),
 			rng.randf_range(0.0, world_size.y - 220.0),
@@ -184,6 +184,14 @@ func squad_count() -> int:
 	return squads.size()
 
 
+func legion_alive() -> int:
+	var n := 0
+	for e in legions:
+		if not e.dead:
+			n += 1
+	return n
+
+
 # ---------------- 波次 ----------------
 func _spawn_wave(i: int) -> void:
 	if i >= waves.size():
@@ -249,7 +257,6 @@ func shadow_update(delta: float) -> void:
 		_check_end()
 	_handle_camera(delta)
 	overlay.queue_redraw()
-	world_layer.queue_redraw()
 
 
 func _update_orders(dt: float) -> void:
@@ -343,6 +350,8 @@ func _update_legions(dt: float) -> void:
 				step = max(0.0, d - rng_px * 0.9)
 			e.position += to.normalized() * step
 			e.facing = lerp_angle(e.facing, to.angle(), clamp(dt * 4.0, 0.0, 1.0))
+			e.position.x = clamp(e.position.x, 24.0, world_size.x - 24.0)
+			e.position.y = clamp(e.position.y, 24.0, world_size.y - 24.0)
 		# 蓄力冲击波
 		if e.stats.get("charge", false):
 			if e.charge > 0.0:
@@ -476,6 +485,14 @@ func _update_combat(dt: float) -> void:
 			e.visible = false
 
 
+func enemy_lit(e) -> bool:
+	if e.revealed > 0.0:
+		return true
+	if thermal_t > 0.0:
+		return true
+	return fog.is_lit(e.position)
+
+
 func _acquire(m):
 	var best = null
 	var bd := 1e20
@@ -486,8 +503,8 @@ func _acquire(m):
 	for e in legions:
 		if e.dead:
 			continue
-		var lit: bool = fog.is_lit(e.position) or thermal_t > 0.0
-		if roe == "visible_only" and not lit:
+		var lit: bool = enemy_lit(e)
+		if not lit:
 			continue
 		var d: float = m.position.distance_to(e.position)
 		var score := d
@@ -517,6 +534,9 @@ func _mech_attack(m, e) -> void:
 		m.crit_ready = false
 	e.take_damage(dmg)
 	m.damage_dealt += dmg
+	var marked_hit: bool = e.marked > 0.0
+	vfx.number(e.position + Vector2(randf_range(-8, 8), -e.size - 6), dmg,
+		Color(1.0, 0.85, 0.35) if marked_hit else Color(0.8, 0.95, 1.0), marked_hit)
 	if e.dead:
 		m.kills += 1
 		G.total_kills += 1
@@ -533,8 +553,9 @@ func _legion_attack(e) -> void:
 	var m = e.target
 	if m == null or m.dead:
 		return
+	e.revealed = 1.8
 	var dmg: float = float(e.stats["atk"])
-	var seen: bool = fog.is_lit(e.position)
+	var seen: bool = enemy_lit(e)
 	# 偷袭：我方没人看见它
 	if not seen and e.seen <= 0.0:
 		dmg *= 2.0
@@ -554,6 +575,8 @@ func _legion_attack(e) -> void:
 	m.take_damage(dmg)
 	if m.squad != null:
 		m.squad.on_member_hurt(dmg)
+		m.squad.facing = lerp_angle(m.squad.facing,
+			(e.position - m.squad.center).angle(), 0.7)
 	vfx.tracer(e.position, m.position, Color(1.0, 0.4, 0.25), 0.08)
 	if m.dead:
 		_on_mech_death(m)
@@ -625,7 +648,7 @@ func _update_fog(dt: float) -> void:
 		fog.stamp_mech(m, dt)
 	fog.tick(dt)
 	for e in legions:
-		var lit: bool = fog.is_lit(e.position) or thermal_t > 0.0
+		var lit: bool = enemy_lit(e)
 		e.visible = lit
 		if lit:
 			e.seen = 0.0
@@ -677,6 +700,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				if selected != null:
 					selected.roe = GameData.ROES[(GameData.ROES.find(selected.roe) + 1) % 4]
 					_push_hint("交战规则：%s" % GameData.ROE_NAME[selected.roe], 1.0)
+			KEY_R:
+				_recover(selected)
 			KEY_TAB:
 				if squads.size() > 1:
 					var i := (squads.find(selected) + 1) % squads.size()
@@ -753,16 +778,16 @@ func _issue_order(sq: Squad, data: Dictionary) -> void:
 	if sq.broken:
 		_push_hint("编队已崩溃，先收容", 1.2)
 		return
-	var delay := sq.order_delay()
-	if priority_channel:
-		delay = 0.0
-		priority_channel = false
 	var er := sq.exec_rate() / 100.0
 	sq.order = data.duplicate()
 	sq.order["exec"] = er
-	sq.order["at"] = t + delay
-	sq.order_t = delay
+	sq.order["at"] = t
+	sq.order_t = 0.0
+	sq.feedback_t = 0.45
+	_apply_order(sq)
+	sq.order = {}
 	_audio("command")
+	_fx_flash(0.05, Color(0.35, 0.8, 1.0))
 
 
 func _resolve_orders() -> void:
@@ -859,6 +884,22 @@ func _apply_card(cid: String) -> void:
 		"silence":
 			selected.silence_t = 8.0
 			_push_hint("静默：8 秒", 1.4)
+
+
+func _recover(sq) -> void:
+	if sq == null:
+		return
+	if not sq.broken:
+		_push_hint("这个编队没有崩溃", 1.2)
+		return
+	if sq.recover_cd > 0.0:
+		_push_hint("收容冷却中 %.0f 秒" % sq.recover_cd, 1.2)
+		return
+	if sq.size_alive() == 0:
+		return
+	sq.recovering = 2.5
+	_push_hint("%s：收容中…" % sq.label, 2.5)
+	_audio("confirm")
 
 
 func _push_hint(text: String, dur: float = 2.0) -> void:
@@ -983,11 +1024,11 @@ func _draw_overlay() -> void:
 		overlay.draw_arc(sq.center, 40.0, 0.0, TAU, 28, Color(c.r, c.g, c.b, 0.16), 1.1)
 		if sq == selected:
 			overlay.draw_arc(sq.center, 46.0, 0.0, TAU, 32, Color(1, 1, 1, 0.22), 1.3)
-		# 命令在途
-		if sq.order_t > 0.0 and not sq.order.is_empty():
-			var f: float = 1.0 - sq.order_t / max(0.01, 2.5)
-			overlay.draw_arc(sq.center, 52.0, -PI * 0.5, -PI * 0.5 + TAU * clamp(f, 0.0, 1.0),
-				30, Color(1.0, 0.85, 0.4, 0.9), 2.4)
+		# 命令回执
+		if sq.feedback_t > 0.0:
+			var f: float = 1.0 - sq.feedback_t / 0.45
+			overlay.draw_arc(sq.center, 30.0 + f * 46.0, 0.0, TAU, 36,
+				Color(0.45, 0.92, 1.0, (1.0 - f) * 0.9), 2.6)
 		# 编队光晕
 		for k in range(3, 0, -1):
 			overlay.draw_circle(sq.center, 26.0 * k, Color(0.25, 0.62, 0.85, 0.035))
@@ -1019,7 +1060,7 @@ func _draw_warning(sq: Squad) -> void:
 		var d: float = e.position.distance_to(sq.center)
 		if d > detect:
 			continue
-		if fog.is_lit(e.position):
+		if enemy_lit(e):
 			continue
 		var ang: float = (e.position - sq.center).angle()
 		var bucket := int(round(ang / (PI / 4.0)))

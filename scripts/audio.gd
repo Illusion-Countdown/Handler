@@ -7,6 +7,7 @@ const NAMES := [
 	"sfx_alarm", "sfx_wave", "sfx_ui", "sfx_radio_open", "sfx_radio_close", "sfx_pulse",
 ]
 const LOOPS := ["amb_drone", "mus_dread"]
+const MUSIC_ENABLED := false
 
 var streams: Dictionary = {}
 var players: Array = []
@@ -40,6 +41,8 @@ func _ready() -> void:
 	amb = AudioStreamPlayer.new()
 	amb.volume_db = -26.0
 	add_child(amb)
+	if not MUSIC_ENABLED:
+		return
 	if streams.has("mus_dread"):
 		music.stream = streams["mus_dread"]
 		music.play()
@@ -60,6 +63,7 @@ func play(n: String, vol_db: float = -4.0, pitch: float = 1.0) -> void:
 
 
 func set_threat(v: float) -> void:
-	## v: 0..1 战场压力，用来抬音乐音量
+	if not MUSIC_ENABLED:
+		return
 	music.volume_db = lerpf(-24.0, -12.0, clamp(v, 0.0, 1.0))
 	amb.volume_db = lerpf(-30.0, -18.0, clamp(v, 0.0, 1.0))

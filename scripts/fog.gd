@@ -11,6 +11,8 @@ var pulsed: PackedFloat32Array
 var _img: Image
 var _tex: ImageTexture
 var _acc: float = 0.0
+var _tick_acc: float = 0.0
+var _prev_visible: Array = []
 var world_size: Vector2
 
 const MEM_FADE := 8.0
@@ -32,8 +34,9 @@ func setup(ws: Vector2) -> void:
 
 
 func begin_frame() -> void:
-	for i in range(gw * gh):
+	for i in _prev_visible:
 		visible_bits[i] = 0
+	_prev_visible.clear()
 
 
 func cell_of(p: Vector2) -> int:
@@ -65,12 +68,14 @@ func stamp_mech(m, dt: float) -> void:
 			var d := wp.distance_to(m.position)
 			var idx := y * gw + x
 			var ok := false
-			if d <= GameData.CELL * 1.6:
+			if d <= GameData.CELL * 2.2:
 				ok = true
 			elif d <= r:
 				var ang := abs(wrapf((wp - m.position).angle() - m.facing, -PI, PI))
 				ok = ang <= half
 			if ok:
+				if visible_bits[idx] == 0:
+					_prev_visible.append(idx)
 				visible_bits[idx] = 1
 				var mem := 45.0 if is_scout else 6.0
 				if remembered[idx] < mem:
@@ -91,42 +96,58 @@ func stamp_pulse(center: Vector2, radius: float) -> void:
 			if wp.distance_to(center) <= radius:
 				var idx := y * gw + x
 				pulsed[idx] = 6.0
+				if visible_bits[idx] == 0:
+					_prev_visible.append(idx)
 				visible_bits[idx] = 1
 				if remembered[idx] < 6.0:
 					remembered[idx] = 6.0
 
 
 func tick(dt: float) -> void:
-	for i in range(gw * gh):
-		if remembered[i] > 0.0:
-			remembered[i] = max(0.0, remembered[i] - dt)
-		if pulsed[i] > 0.0:
-			pulsed[i] = max(0.0, pulsed[i] - dt)
+	_tick_acc += dt
+	if _tick_acc >= 0.05:
+		var d: float = _tick_acc
+		_tick_acc = 0.0
+		for i in range(gw * gh):
+			if remembered[i] > 0.0:
+				remembered[i] = max(0.0, remembered[i] - d)
+			if pulsed[i] > 0.0:
+				pulsed[i] = max(0.0, pulsed[i] - d)
 	_acc += dt
-	if _acc >= 0.08:
+	if _acc >= 0.14:
 		_acc = 0.0
 		_rebuild()
 
 
 func _rebuild() -> void:
-	for i in range(gw * gh):
+	# 只写一次字节数组，再交给 Image.set_data —— 避免 2240 次 set_pixel
+	var n: int = gw * gh
+	var data := PackedByteArray()
+	data.resize(n * 4)
+	for i in range(n):
 		var a := 1.0
 		if visible_bits[i] == 1 or pulsed[i] > 0.0:
 			a = 0.0
 		elif remembered[i] > 0.0:
 			a = 1.0 - 0.66 * clamp(remembered[i] / MEM_FADE, 0.0, 1.0)
-		_img.set_pixel(i % gw, i / gw, Color(0.004, 0.008, 0.016, a * 0.93))
-	# 3x3 盒式模糊：让雾的边缘是软的
-	for pass_i in range(1):
-		var src := _img.duplicate()
-		for y in range(1, gh - 1):
-			for x in range(1, gw - 1):
-				var s := 0.0
-				for dy in range(-1, 2):
-					for dx in range(-1, 2):
-						s += src.get_pixel(x + dx, y + dy).a
-				var a2: float = s / 9.0
-				_img.set_pixel(x, y, Color(0.004, 0.008, 0.016, a2))
+		var o: int = i * 4
+		data[o] = 1
+		data[o + 1] = 2
+		data[o + 2] = 5
+		data[o + 3] = int(clamp(a * 0.93, 0.0, 1.0) * 255.0)
+	# 3x3 盒式模糊（只在字节数组上做，一次）
+	var src := data.duplicate()
+	for y in range(1, gh - 1):
+		var row: int = y * gw
+		for x in range(1, gw - 1):
+			var s := 0
+			for dy in range(-1, 2):
+				var r2: int = (y + dy) * gw
+				s += src[(r2 + x - 1) * 4 + 3]
+				s += src[(r2 + x) * 4 + 3]
+				s += src[(r2 + x + 1) * 4 + 3]
+			data[(row + x) * 4 + 3] = s / 9
+	_img.set_data(gw, gh, false, Image.FORMAT_RGBA8, data)
 	_tex.update(_img)
 	queue_redraw()
 

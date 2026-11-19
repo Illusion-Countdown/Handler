@@ -27,7 +27,39 @@ func _ready() -> void:
 	if "flow" in OS.get_cmdline_user_args():
 		_run_flow()
 		return
+	if "perf" in OS.get_cmdline_user_args():
+		_run_perf()
+		return
 	_show_title()
+
+
+func _run_perf() -> void:
+	print("[PERF] start")
+	_start_campaign()
+	await get_tree().process_frame
+	_on_request_battle("anvil")
+	await get_tree().process_frame
+	if battle == null:
+		print("[PERF] no battle")
+		get_tree().quit()
+		return
+	var samples: Array = []
+	for i in range(12):
+		await get_tree().create_timer(1.0).timeout
+		if battle == null:
+			break
+		var f: int = Engine.get_frames_per_second()
+		samples.append(f)
+		print("[PERF] t=", snapped(battle.elapsed, 0.1),
+			" fps=", f, " legions=", battle.legion_alive(),
+			" objs=", battle.legions.size(), " mechs=", battle.mechs.size())
+	var mn := 999
+	var sum := 0
+	for f in samples:
+		mn = min(mn, f)
+		sum += f
+	print("[PERF] min=", mn, " avg=", int(sum / max(1, samples.size())))
+	get_tree().quit()
 
 
 func _run_flow() -> void:

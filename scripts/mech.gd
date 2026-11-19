@@ -35,7 +35,7 @@ func setup(config_id: String, p_pilot: Dictionary, pos: Vector2) -> void:
 	max_hp = float(stats["hp"])
 	hp = max_hp
 	position = pos
-	facing = randf() * TAU
+	facing = 0.0
 	wander = randf() * TAU
 
 

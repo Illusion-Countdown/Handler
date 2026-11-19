@@ -7,6 +7,7 @@ var blasts: Array = []
 var pulses: Array = []
 var flashes: Array = []
 var rings: Array = []
+var texts: Array = []
 
 
 func tracer(a: Vector2, b: Vector2, col: Color, life: float = 0.08) -> void:
@@ -20,6 +21,10 @@ func explosion(pos: Vector2, col: Color, radius: float) -> void:
 
 func pulse(pos: Vector2, radius: float) -> void:
 	pulses.append({"p": pos, "r": radius, "t": 0.8, "max": 0.8})
+
+
+func number(pos: Vector2, value: float, col: Color, big: bool = false) -> void:
+	texts.append({"p": pos, "v": value, "col": col, "t": 0.75, "max": 0.75, "big": big})
 
 
 func flash(col: Color, life: float) -> void:
@@ -57,6 +62,13 @@ func _process(delta: float) -> void:
 		if x["t"] > 0.0:
 			alive_r.append(x)
 	rings = alive_r
+	var alive_x := []
+	for x in texts:
+		x["t"] -= delta
+		x["p"] += Vector2(0, -26.0 * delta)
+		if x["t"] > 0.0:
+			alive_x.append(x)
+	texts = alive_x
 	queue_redraw()
 
 
@@ -76,6 +88,13 @@ func _draw() -> void:
 		var f: float = 1.0 - x["t"] / x["max"]
 		draw_arc(x["p"], x["r"] * (0.2 + f * 0.8), 0.0, TAU, 48,
 			Color(0.4, 0.85, 1.0, (1.0 - f) * 0.5), 2.0)
+	var fnt := ThemeDB.fallback_font
+	for x in texts:
+		var a: float = clamp(x["t"] / x["max"], 0.0, 1.0)
+		var sz: int = 20 if x["big"] else 14
+		var s := "%d" % int(x["v"])
+		draw_string(fnt, x["p"] + Vector2(-8, 0), s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz,
+			Color(x["col"].r, x["col"].g, x["col"].b, a))
 	for x in flashes:
 		var f: float = x["t"] / x["max"]
 		var sz := get_viewport().get_visible_rect().size

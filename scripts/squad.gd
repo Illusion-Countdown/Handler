@@ -8,7 +8,7 @@ signal member_died(mech)
 
 var members: Array = []
 var battle = null
-var stance: String = "attack"
+var stance: String = "hold"
 var roe: String = "nearest"
 var center: Vector2 = Vector2.ZERO
 var dest: Vector2 = Vector2.ZERO
@@ -28,6 +28,8 @@ var absorb: float = 0.0          # 断后：替全队承伤
 var absorb_t: float = 0.0
 var no_retreat_t: float = 0.0
 var resonance: float = 0.0      # 合流同步共振
+var feedback_t: float = 0.0     # 命令回执（视觉反馈）
+var grace: float = 0.0          # 收容后的宽限
 var silence_t: float = 0.0
 var jammed_t: float = 0.0
 var order: Dictionary = {}      # 当前在途命令
@@ -88,6 +90,7 @@ func update(dt: float, battle) -> void:
 	absorb_t = max(0.0, absorb_t - dt)
 	no_retreat_t = max(0.0, no_retreat_t - dt)
 	resonance = max(0.0, resonance - dt)
+	feedback_t = max(0.0, feedback_t - dt)
 	silence_t = max(0.0, silence_t - dt)
 	_recalc_center()
 
@@ -95,21 +98,22 @@ func update(dt: float, battle) -> void:
 		recovering -= dt
 		if recovering <= 0.0:
 			broken = false
-			integrity = 40.0
+			grace = 7.0
+			recover_cd = 30.0
 			emit_signal("recovered", self)
 		_update_members(dt)
 		return
 
-	# 完整性恢复
-	if integrity < max_integrity:
-		integrity = min(max_integrity, integrity + dt * 1.0)
+	# 完整性直接由机体血量推导
+	grace = max(0.0, grace - dt)
+	integrity = strength() * 100.0
 
 	if broken:
 		_update_members(dt)
 		return
 
-	# 崩溃判定
-	if integrity <= 0.0:
+	# 崩溃判定：平均血量跌破 32%
+	if integrity <= 32.0 and grace <= 0.0:
 		broken = true
 		dest = _retreat_point(battle)
 		has_dest = true
@@ -130,8 +134,12 @@ func _retreat_point(battle) -> Vector2:
 func _nearest_enemy(battle):
 	var best = null
 	var bd := 1e20
+	if battle.fog == null:
+		return null
 	for e in battle.legions:
 		if e.dead:
+			continue
+		if not battle.fog.is_lit(e.position):
 			continue
 		var d := center.distance_to(e.position)
 		if d < bd:
@@ -150,7 +158,7 @@ func _move_squad(dt: float, battle) -> void:
 		"attack":
 			if e != null:
 				tgt = e.position
-				if center.distance_to(e.position) < 130.0:
+				if center.distance_to(e.position) < 82.0:
 					tgt = center
 			elif has_dest:
 				tgt = dest
@@ -177,6 +185,8 @@ func _move_squad(dt: float, battle) -> void:
 			step = to
 		center += step
 		facing = lerp_angle(facing, to.angle(), clamp(dt * 3.0, 0.0, 1.0))
+	center.x = clamp(center.x, 40.0, GameData.GRID_W * GameData.CELL - 40.0)
+	center.y = clamp(center.y, 40.0, GameData.GRID_H * GameData.CELL - 40.0)
 
 
 func _update_members(dt: float) -> void:
@@ -203,10 +213,13 @@ func _update_members(dt: float) -> void:
 				mv = to
 			m.position += mv
 			m.facing = lerp_angle(m.facing, mv.angle(), clamp(dt * 6.0, 0.0, 1.0))
+		else:
+			m.facing = lerp_angle(m.facing, facing, clamp(dt * 3.0, 0.0, 1.0))
+		m.position.x = clamp(m.position.x, 24.0, GameData.GRID_W * GameData.CELL - 24.0)
+		m.position.y = clamp(m.position.y, 24.0, GameData.GRID_H * GameData.CELL - 24.0)
 
 
 func on_member_hurt(dmg: float) -> void:
-	integrity -= dmg * 1.2
 	member_lost += dmg
 	last_loss = 0.0
 
@@ -225,7 +238,7 @@ func exec_rate() -> float:
 	for m in members:
 		if m.pilot.has("trust"):
 			trust = max(trust, float(m.pilot["trust"]))
-	var base := 30.0 + 0.5 * trust + (attention - 1.0 / float(n)) * 100.0
+	var base := 46.0 + 0.45 * trust + (attention - 1.0 / float(n)) * 100.0
 	# 指挥型加成
 	for m in alive():
 		if m.cfg_id == "command":
@@ -236,14 +249,7 @@ func exec_rate() -> float:
 
 
 func order_delay() -> float:
-	var n := 1
-	if battle != null:
-		n = max(1, int(battle.squads.size()))
-	var d := 2.5 + (1.0 - attention * float(n)) * 1.5
-	for m in alive():
-		if m.cfg_id == "command":
-			d -= 0.4
-	return max(1.2, d)
+	return 0.0
 
 
 func _draw() -> void:

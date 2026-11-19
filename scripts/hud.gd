@@ -58,6 +58,21 @@ func _draw_hud() -> void:
 	_draw_cards(vs)
 	_draw_hint(vs)
 	_draw_footer(vs)
+	_draw_pause(vs)
+
+
+func _draw_pause(vs: Vector2) -> void:
+	if not battle.paused:
+		return
+	canvas.draw_rect(Rect2(Vector2.ZERO, vs), Color(0.0, 0.02, 0.05, 0.55))
+	var cx := vs.x * 0.5
+	var cy := vs.y * 0.5
+	canvas.draw_string(font, Vector2(cx - 200, cy - 10), "已 暂 停", HORIZONTAL_ALIGNMENT_CENTER,
+		400, 46, Color(1.0, 0.86, 0.4))
+	canvas.draw_string(font, Vector2(cx - 240, cy + 34), "按 空格 继续作战",
+		HORIZONTAL_ALIGNMENT_CENTER, 480, 18, Color(0.8, 0.9, 1.0))
+	canvas.draw_string(font, Vector2(cx - 240, cy + 60), "（暂停时 WASD / 滚轮 仍然可以看战场）",
+		HORIZONTAL_ALIGNMENT_CENTER, 480, 13, Color(0.5, 0.62, 0.74))
 
 
 func _draw_squads(vs: Vector2) -> void:
@@ -137,6 +152,8 @@ func _draw_status(vs: Vector2) -> void:
 	# 脑髓
 	_txt(Vector2(x, 134), "回收 %d   丢失 %d" % [battle.brains_saved, battle.brains_lost], 13,
 		Color(0.5, 0.95, 0.75) if battle.brains_lost == 0 else COL_WARN)
+	_txt(Vector2(x, 156), "%d FPS  ·  %d 军团" % [Engine.get_frames_per_second(), battle.legion_alive()], 11,
+		Color(0.32, 0.42, 0.52))
 
 
 func _draw_waves(vs: Vector2) -> void:
@@ -216,5 +233,5 @@ func _draw_hint(vs: Vector2) -> void:
 
 
 func _draw_footer(vs: Vector2) -> void:
-	var s := "左键选编队 / 点敌人集火 / 点地面前进    右键＝点亮迷雾    Q 姿态   E 交战规则   空格 暂停   滚轮 缩放"
+	var s := "左键 选编队/集火/前进    右键 点亮迷雾    Q 姿态   E 规则   R 收容   空格 暂停   滚轮 缩放"
 	_txt(Vector2(340, vs.y - 18), s, 12, COL_DIM)

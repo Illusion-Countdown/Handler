@@ -253,7 +253,7 @@ func _separate(dt: float) -> void:
 				var b = alive_l[j]
 				var d2: Vector2 = a.position - b.position
 				var dist2 := d2.length()
-				var mind2: float = (a.size + b.size) * 1.15
+				var mind2: float = (a.size + b.size) * 1.45
 				if dist2 < mind2:
 					if dist2 < 0.01:
 						d2 = Vector2.RIGHT.rotated(randf() * TAU)
@@ -333,6 +333,7 @@ func _spawn_wave(i: int) -> void:
 func _spawn_legion(kind: String, pos: Vector2, hp_mult: float = 1.0) -> void:
 	var e := LegionUnit.new()
 	e.setup(kind, pos)
+	e.slot_angle = float(legions.size()) * 2.399963 + rng.randf_range(-0.12, 0.12)
 	if hp_mult != 1.0:
 		e.max_hp *= hp_mult
 		e.hp = e.max_hp
@@ -451,16 +452,18 @@ func _update_legions(dt: float) -> void:
 			e.target = _nearest_mech(e.position, target_list)
 		if e.target == null:
 			continue
-		var to: Vector2 = e.target.position - e.position
-		var d: float = to.length()
 		var rng_px: float = e.atk_range_px()
 		if e.kind == "recovery":
 			_update_recovery_ai(e, dt)
 			continue
-		if d > rng_px * 0.92:
+		# 目标不是"敌人中心"，而是围绕他的一圈包抄位
+		var stand: Vector2 = e.target.position + Vector2.RIGHT.rotated(e.slot_angle) * (rng_px * 0.88)
+		var to: Vector2 = stand - e.position
+		var d: float = to.length()
+		if d > 8.0:
 			var step: float = e.speed_px() * dt
-			if step > d - rng_px * 0.9:
-				step = max(0.0, d - rng_px * 0.9)
+			if step > d:
+				step = d
 			e.position += to.normalized() * step
 			e.facing = lerp_angle(e.facing, to.angle(), clamp(dt * 4.0, 0.0, 1.0))
 			e.position.x = clamp(e.position.x, 24.0, world_size.x - 24.0)
@@ -478,7 +481,8 @@ func _update_legions(dt: float) -> void:
 					e.charge_cd = 9.0
 		# 攻击
 		e.cd -= dt
-		if e.cd <= 0.0 and d <= rng_px:
+		var dtarget: float = e.position.distance_to(e.target.position)
+		if e.cd <= 0.0 and dtarget <= rng_px:
 			e.cd = 1.0 / float(e.stats["aspd"])
 			_legion_attack(e)
 

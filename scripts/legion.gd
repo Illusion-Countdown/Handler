@@ -21,6 +21,7 @@ var seen: float = 0.0            # 最近一次被我方看见的时间戳
 var slow: float = 0.0
 var jam_t: float = 0.0
 var revealed: float = 0.0
+var slot_angle: float = 0.0
 var recovery_t: float = 0.0
 var size: float = 11.0
 
@@ -35,6 +36,7 @@ func setup(k: String, pos: Vector2) -> void:
 	size = float(stats.get("size", 9.0))
 	position = pos
 	facing = randf() * TAU
+	slot_angle = randf() * TAU
 	charge_cd = randf_range(4.0, 9.0)
 
 

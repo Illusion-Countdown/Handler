@@ -79,10 +79,8 @@ func _recalc_center() -> void:
 	for m in a:
 		c += m.position
 	c = c / float(a.size())
-	# 移动中：中心绝对权威（保证走直线、必到达）
-	# 站定时：软跟随成员，避免槽位微动带着中心跳
-	if not has_dest:
-		center = center.lerp(c, 0.34)
+	# 中心永远只由"指令"驱动：不跟随成员位置，避免任何形式的漂移/绕圈
+	# （成员被挤开时，会自己走回队形槽位）
 
 
 func strength() -> float:

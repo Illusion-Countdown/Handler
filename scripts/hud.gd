@@ -90,6 +90,14 @@ func _draw_objective(vs: Vector2) -> void:
 				line += "    核心 %d%%" % int(battle.boss_ref.hp_frac() * 100.0)
 	canvas.draw_string(font, Vector2(vs.x * 0.5 - 300, 40), line, HORIZONTAL_ALIGNMENT_CENTER,
 		600, 18, Color(1.0, 0.86, 0.42))
+	# 目标方向罗盘（指向当前目标点）
+	var goal: Vector2 = battle.objective_point()
+	var ang: float = (goal - battle.cam.position).angle()
+	var ac := Vector2(vs.x * 0.5 - 330.0, 34.0)
+	var dir := Vector2.RIGHT.rotated(ang)
+	var perp := Vector2(-dir.y, dir.x)
+	var tri := PackedVector2Array([ac + dir * 15.0, ac - dir * 9.0 + perp * 10.0, ac - dir * 9.0 - perp * 10.0])
+	canvas.draw_colored_polygon(tri, Color(1.0, 0.86, 0.38, 0.95))
 	# 视野充能
 	var charge_txt := "视野 %d / %d" % [battle.vision_charges, battle.VISION_MAX]
 	canvas.draw_string(font, Vector2(vs.x * 0.5 - 300, 64), charge_txt, HORIZONTAL_ALIGNMENT_CENTER,

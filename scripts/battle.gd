@@ -48,7 +48,11 @@ var boss_ref = null
 var boss_summon_t: float = 0.0
 var endless: bool = false
 var endless_t: float = 0.0
-const ENDLESS_GAP := 10.0
+var boss_control_t: float = 8.0
+var boss_press_t: float = 0.0
+const ENDLESS_GAP := 7.0
+const DENSITY := 1.7          # 波次人数倍率
+const WAVE_SPEED := 0.6       # 波次间隔倍率（越小越密）
 var vision_charges: int = 3
 var vision_t: float = 0.0
 const VISION_MAX := 3
@@ -347,7 +351,9 @@ func _spawn_wave(i: int) -> void:
 		all_spawned = true
 		return
 	var w: Dictionary = waves[i]
-	var count := int(w["count"])
+	var count := int(ceil(float(w["count"]) * DENSITY))
+	if String(w["type"]) == "shepherd":
+		count = 1
 	var bearings: Array = w.get("bearings", [0.0])
 	var center := map_center()
 	var radius: float = min(world_size.x, world_size.y) * 0.26
@@ -472,7 +478,7 @@ func _update_waves(dt: float) -> void:
 		return
 	wave_t += dt
 	var w: Dictionary = waves[wave_idx]
-	if wave_t >= float(w["delay"]):
+	if wave_t >= float(w["delay"]) * WAVE_SPEED:
 		_spawn_wave(wave_idx)
 		wave_idx += 1
 		wave_t = 0.0
@@ -873,7 +879,7 @@ func _update_endless(dt: float) -> void:
 		return
 	endless_t = 0.0
 	var b: float = randf() * TAU
-	var n: int = 4 + randi() % 5
+	var n: int = 6 + randi() % 7
 	var kinds := ["infantry", "swarm", "swarm", "lance", "armored"]
 	var center2 := map_center()
 	var radius2: float = min(world_size.x, world_size.y) * 0.30
@@ -891,14 +897,42 @@ func _update_boss(dt: float) -> void:
 	if boss_ref == null or boss_ref.dead:
 		return
 	boss_summon_t += dt
-	if boss_summon_t >= 9.0:
+	if boss_summon_t >= 6.0:
 		boss_summon_t = 0.0
-		for k in range(3):
+		for k in range(4):
 			var a: float = randf() * TAU
 			var p: Vector2 = boss_ref.position + Vector2.RIGHT.rotated(a) * 150.0
 			_spawn_legion("infantry", p)
 		_push_hint("牧羊人正在召唤援军", 1.6)
 		_sfx("sfx_alarm", 0.6, -8.0)
+	# 压制波：把附近的机体钉住
+	boss_control_t -= dt
+	if boss_control_t <= 0.0:
+		boss_control_t = 13.0
+		vfx.ripple(boss_ref.position, Color(0.9, 0.15, 0.1), 340.0)
+		vfx.explosion(boss_ref.position, Color(0.9, 0.2, 0.12), 70.0)
+		shake = max(shake, 0.5)
+		var hit := 0
+		for m in mechs:
+			if m.dead:
+				continue
+			if m.position.distance_to(boss_ref.position) < 340.0:
+				m.stagger = 2.2
+				hit += 1
+		_push_hint("牧羊人压制了你的人（%d 台被钉住）" % hit, 2.0)
+		_sfx("sfx_jam", 0.4, -4.0, 0.7)
+	# BOSS 缓慢压进
+	var near_m = null
+	var nd := 1e20
+	for m in mechs:
+		if m.dead:
+			continue
+		var dd: float = m.position.distance_to(boss_ref.position)
+		if dd < nd:
+			nd = dd
+			near_m = m
+	if near_m != null and nd > 150.0:
+		boss_ref.position += (near_m.position - boss_ref.position).normalized() * 42.0 * dt
 	# 弱点周期：每 9 秒睁开 3 秒
 	boss_ref.charge_cd -= dt
 	if boss_ref.charge_cd <= 0.0:
@@ -1408,6 +1442,22 @@ func _draw_overlay() -> void:
 			overlay.draw_circle(sq.center, 26.0 * k, Color(0.25, 0.62, 0.85, 0.035))
 		# 方位提示
 		_draw_warning(sq)
+	# 前进方向引导（每个编队一条指向目标的虚线）
+	var gty: String = String(objective.get("type", "kill"))
+	if gty == "escape" or gty == "reach" or gty == "boss":
+		var gp: Vector2 = objective_point()
+		for sq in squads:
+			var dvec: Vector2 = gp - sq.center
+			var dl2: float = dvec.length()
+			if dl2 < 40.0:
+				continue
+			var step: Vector2 = dvec.normalized() * 26.0
+			var p: Vector2 = sq.center
+			var guard := 0
+			while p.distance_to(sq.center) < min(dl2 - 20.0, 320.0) and guard < 14:
+				guard += 1
+				p += step
+				overlay.draw_line(p, p + step * 0.45, Color(1.0, 0.85, 0.4, 0.28), 2.0)
 	# 撤离点 / 目标点
 	var oty: String = String(objective.get("type", "kill"))
 	if oty == "escape" or oty == "reach":

@@ -91,8 +91,8 @@ const LEGION := {
 		"speed": 1.7, "armor": 0.1, "danger": 0.5, "size": 10.0, "recovery": true,
 	},
 	"shepherd": {
-		"name": "牧羊人", "hp": 220.0, "atk": 14.0, "aspd": 0.7, "range": 5.0,
-		"speed": 1.45, "armor": 0.2, "danger": 5.0, "size": 16.0, "boss": true,
+		"name": "牧羊人", "hp": 2600.0, "atk": 26.0, "aspd": 0.8, "range": 6.0,
+		"speed": 1.1, "armor": 0.3, "danger": 9.0, "size": 54.0, "boss": true,
 	},
 }
 

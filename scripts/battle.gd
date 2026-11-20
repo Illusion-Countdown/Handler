@@ -46,6 +46,9 @@ var exit_pos: Vector2 = Vector2.ZERO
 var reach_t: float = 0.0
 var boss_ref = null
 var boss_summon_t: float = 0.0
+var endless: bool = false
+var endless_t: float = 0.0
+const ENDLESS_GAP := 10.0
 var vision_charges: int = 3
 var vision_t: float = 0.0
 const VISION_MAX := 3
@@ -80,6 +83,7 @@ func _ready() -> void:
 
 func begin() -> void:
 	objective = encounter.get("obj", {"type": "kill", "desc": "歼灭全部军团"})
+	endless = bool(encounter.get("endless", false))
 	exit_pos = _pick_exit()
 	if waves.size() > 0:
 		_spawn_wave(0)
@@ -111,12 +115,12 @@ func _build_layers() -> void:
 	var env := Environment.new()
 	env.background_mode = Environment.BG_CANVAS
 	env.glow_enabled = true
-	env.glow_intensity = 0.55
-	env.glow_strength = 0.7
+	env.glow_intensity = 0.22
+	env.glow_strength = 0.5
 	env.glow_bloom = 0.0
 	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_ADDITIVE
-	env.glow_hdr_threshold = 1.05
-	env.glow_hdr_scale = 1.6
+	env.glow_hdr_threshold = 1.35
+	env.glow_hdr_scale = 1.2
 	env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
 	we.environment = env
 	add_child(we)
@@ -412,6 +416,7 @@ func shadow_update(delta: float) -> void:
 		_separate(dt)
 		_update_recoveries(dt)
 		_update_boss(dt)
+		_update_endless(dt)
 		_update_fog(dt)
 		cp = min(10.0, cp)
 		if thermal_t > 0.0:
@@ -629,6 +634,9 @@ func _update_combat(dt: float) -> void:
 			continue
 		var d: float = m.position.distance_to(tgt.position)
 		var rng_px := float(m.stats["range"]) * GameData.CELL
+		if m.cfg_id == "heavy" and m.sweep_cd <= 0.0 and d <= rng_px + 90.0:
+			m.sweep_cd = 6.5
+			_sweep_laser(m)
 		if d <= rng_px and m.cd <= 0.0:
 			var aspd := float(m.stats["aspd"])
 			if m.squad != null and m.squad.formation_t > 0.0:
@@ -746,6 +754,43 @@ func _mech_attack(m, e) -> void:
 		e.slow = max(e.slow, 3.0)
 
 
+func _sweep_laser(m) -> void:
+	var r: float = 230.0
+	var half: float = deg_to_rad(70.0)
+	var hit := 0
+	for e in legions:
+		if e.dead:
+			continue
+		var dv: Vector2 = e.position - m.position
+		if dv.length() > r:
+			continue
+		var ang: float = abs(wrapf(dv.angle() - m.facing, -PI, PI))
+		if ang > half:
+			continue
+		var dmg: float = m.base_atk() * 1.7
+		if e.marked > 0.0:
+			dmg *= 1.4
+		if m.squad != null and e == m.squad.focus:
+			dmg *= m.squad.focus_power
+		e.take_damage(dmg)
+		hit += 1
+		vfx.impact(e.position, Color(1.0, 0.9, 0.55), 1.3)
+		if e.dead:
+			m.kills += 1
+			G.total_kills += 1
+			vfx.explosion(e.position, Color(1.0, 0.45, 0.2), 18.0 + e.size)
+	# 扫射特效：几道扇形激光
+	for k in range(6):
+		var a0: float = m.facing - half + (2.0 * half) * float(k) / 5.0
+		var p0: Vector2 = m.position
+		var p1: Vector2 = p0 + Vector2.RIGHT.rotated(a0) * r
+		vfx.beam(p0, p1, Color(1.0, 0.82, 0.35), 5.0)
+	vfx.muzzle(m.position, m.facing, Color(1.0, 0.85, 0.4))
+	shake = max(shake, 0.22)
+	_sfx("sfx_cannon", 0.2, -6.0, 0.85)
+	_push_hint("重装扫射 · 命中 %d" % hit, 1.2)
+
+
 func _legion_attack(e) -> void:
 	var m = e.target
 	if m == null or m.dead:
@@ -818,6 +863,28 @@ func _on_mech_death(m) -> void:
 	_push_hint("阵亡：%s。脑髓还在，45 秒。" % m.pilot.get("callsign", "?"), 3.0)
 	if m.squad != null:
 		m.squad.on_member_died(m)
+
+
+func _update_endless(dt: float) -> void:
+	if not endless or state != "fight":
+		return
+	endless_t += dt
+	if endless_t < ENDLESS_GAP:
+		return
+	endless_t = 0.0
+	var b: float = randf() * TAU
+	var n: int = 4 + randi() % 5
+	var kinds := ["infantry", "swarm", "swarm", "lance", "armored"]
+	var center2 := map_center()
+	var radius2: float = min(world_size.x, world_size.y) * 0.30
+	for k in range(n):
+		var kk: String = kinds[randi() % kinds.size()]
+		var p: Vector2 = center2 + Vector2.RIGHT.rotated(b + rng.randf_range(-0.5, 0.5)) * radius2
+		p += Vector2(rng.randf_range(-80, 80), rng.randf_range(-80, 80))
+		p.x = clamp(p.x, 40.0, world_size.x - 40.0)
+		p.y = clamp(p.y, 40.0, world_size.y - 40.0)
+		_spawn_legion(kk, p)
+	_push_hint("新的军团编队正在接近", 1.2)
 
 
 func _update_boss(dt: float) -> void:

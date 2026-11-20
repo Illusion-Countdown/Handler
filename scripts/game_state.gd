@@ -44,14 +44,30 @@ func new_run() -> void:
 	run_won = false
 	seen_memorial.clear()
 
-	# 开局：一名特殊机师 + 一名普通机师，一个编队
+	# 演示开局：三名特殊机师 + 三名普通机师，三个编队
+	run_squads.clear()
 	var hero := make_special("undertaker")
 	roster.append(hero)
-	var g1 := make_generic()
-	roster.append(g1)
-	var g2 := make_generic()
-	roster.append(g2)
-	run_squads.append({"members": [hero, g1, g2]})
+	var hero2 := make_special("gunslinger")
+	roster.append(hero2)
+	var hero3 := make_special("snowwitch")
+	roster.append(hero3)
+	var c1 := make_generic("heavy")
+	roster.append(c1)
+	var c2 := make_generic("sniper")
+	roster.append(c2)
+	var c3 := make_generic("suppress")
+	roster.append(c3)
+	var c4 := make_generic("melee")
+	roster.append(c4)
+	var c5 := make_generic("rifle")
+	roster.append(c5)
+	var c6 := make_generic("recon")
+	roster.append(c6)
+	run_squads.append({"members": [hero, c1, c4]})
+	run_squads.append({"members": [hero2, c2, c5]})
+	run_squads.append({"members": [hero3, c3, c6]})
+	deck = ["thermal", "jam", "merge", "no_retreat"]
 	_add_log_start()
 
 

@@ -66,6 +66,14 @@ const LEGION := {
 		"name": "步兵型", "hp": 26.0, "atk": 5.0, "aspd": 1.05, "range": 3.0,
 		"speed": 2.55, "armor": 0.0, "danger": 1.0, "size": 9.0,
 	},
+	"swarm": {
+		"name": "蜂群型", "hp": 14.0, "atk": 3.0, "aspd": 1.6, "range": 2.2,
+		"speed": 3.2, "armor": 0.0, "danger": 0.7, "size": 9.0,
+	},
+	"lance": {
+		"name": "光矛型", "hp": 30.0, "atk": 9.0, "aspd": 0.45, "range": 7.5,
+		"speed": 1.2, "armor": 0.05, "danger": 2.2, "size": 12.0,
+	},
 	"armored": {
 		"name": "装甲型", "hp": 85.0, "atk": 8.5, "aspd": 0.5, "range": 3.2,
 		"speed": 1.8, "armor": 0.32, "danger": 2.4, "size": 12.0, "charge": true,
@@ -200,8 +208,8 @@ const ROE_NAME := {"nearest": "最近", "dangerous": "最危险", "visible_only"
 # ---------------- 战役 ----------------
 # 固定流程，可选分支。type: battle / explore / rest / boss
 const CAMPAIGN := [
-	{"id": "n1", "name": "接触", "type": "battle", "act": 1, "next": ["n2"],
-		"enc": "skirmish", "brief": "第一段战线。两机对六机。"},
+	{"id": "n1", "name": "火力展示", "type": "battle", "act": 1, "next": ["n2"],
+		"enc": "demo", "brief": "示范关：三队混编，敌兵种全上，看特效和指挥。"},
 	{"id": "n2", "name": "废墟", "type": "explore", "act": 1, "next": ["n3", "n3b"],
 		"brief": "城市废墟。补给与卡牌都在里面，时间在外面。"},
 	{"id": "n3", "name": "钳形", "type": "battle", "act": 1, "next": ["n4"],
@@ -224,24 +232,40 @@ const CAMPAIGN := [
 
 # 遭遇定义：waves = [{type, count, bearing, delay}]
 const ENCOUNTERS := {
+	"demo": {
+		"name": "火力展示", "pressure": 0, "time_limit": 0.0, "endless": true,
+		"obj": {"type": "hold", "desc": "防守 75 秒，看各兵种开火", "need": 75.0},
+		"waves": [
+			{"type": "infantry", "count": 8, "delay": 2.0, "bearings": [0.0]},
+			{"type": "swarm", "count": 8, "delay": 8.0, "bearings": [2.2]},
+			{"type": "armored", "count": 3, "delay": 14.0, "bearings": [4.0]},
+			{"type": "lance", "count": 3, "delay": 20.0, "bearings": [5.2]},
+			{"type": "ew", "count": 2, "delay": 26.0, "bearings": [1.2]},
+			{"type": "infantry", "count": 10, "delay": 34.0, "bearings": [3.0]},
+			{"type": "armored", "count": 4, "delay": 44.0, "bearings": [0.8]},
+			{"type": "swarm", "count": 12, "delay": 54.0, "bearings": [4.8]},
+		],
+	},
 	"skirmish": {
 		"name": "接触", "pressure": 0, "time_limit": 0.0,
 		"obj": {"type": "escape", "desc": "突围：抵达撤离点"},
 		"waves": [
-			{"type": "infantry", "count": 9, "delay": 1.0, "bearings": [0.0]},
-			{"type": "infantry", "count": 8, "delay": 7.0, "bearings": [2.3]},
-			{"type": "infantry", "count": 7, "delay": 13.0, "bearings": [4.2]},
-			{"type": "infantry", "count": 6, "delay": 19.0, "bearings": [5.4]},
+			{"type": "infantry", "count": 8, "delay": 1.0, "bearings": [0.0]},
+			{"type": "swarm", "count": 6, "delay": 4.0, "bearings": [2.3]},
+			{"type": "infantry", "count": 7, "delay": 9.0, "bearings": [4.2]},
+			{"type": "lance", "count": 2, "delay": 14.0, "bearings": [5.4]},
+			{"type": "swarm", "count": 6, "delay": 19.0, "bearings": [1.2]},
 		],
 	},
 	"pincer": {
 		"name": "钳形", "pressure": 6, "time_limit": 0.0,
 		"obj": {"type": "escape", "desc": "突破：抵达对面集结点"},
 		"waves": [
-			{"type": "infantry", "count": 11, "delay": 1.0, "bearings": [0.0]},
-			{"type": "infantry", "count": 10, "delay": 6.0, "bearings": [3.14]},
-			{"type": "armored", "count": 4, "delay": 13.0, "bearings": [1.4]},
-			{"type": "infantry", "count": 9, "delay": 19.0, "bearings": [4.6]},
+			{"type": "infantry", "count": 10, "delay": 1.0, "bearings": [0.0]},
+			{"type": "swarm", "count": 8, "delay": 4.0, "bearings": [3.14]},
+			{"type": "armored", "count": 4, "delay": 11.0, "bearings": [1.4]},
+			{"type": "lance", "count": 3, "delay": 16.0, "bearings": [4.6]},
+			{"type": "infantry", "count": 8, "delay": 22.0, "bearings": [5.2]},
 		],
 	},
 	"outpost": {
@@ -254,7 +278,7 @@ const ENCOUNTERS := {
 		],
 	},
 	"anvil": {
-		"name": "铁砧", "pressure": 10, "time_limit": 0.0,
+		"name": "铁砧", "pressure": 10, "time_limit": 0.0, "endless": true,
 		"obj": {"type": "hold", "desc": "坚守 90 秒", "need": 90.0},
 		"waves": [
 			{"type": "armored", "count": 2, "delay": 2.0, "bearings": [0.0]},

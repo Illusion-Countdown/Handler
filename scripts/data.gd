@@ -6,8 +6,8 @@ extends Node
 # ---------------- 基础 ----------------
 const CELL := 32.0
 const MOVE_SCALE := 0.60      # 全局移动速度系数（手感总开关）
-const GRID_W := 96
-const GRID_H := 68
+const GRID_W := 64
+const GRID_H := 46
 
 const MECH_BASE := {
 	"hp": 190.0, "atk": 13.0, "aspd": 1.0, "range": 3.8,
@@ -226,6 +226,7 @@ const CAMPAIGN := [
 const ENCOUNTERS := {
 	"skirmish": {
 		"name": "接触", "pressure": 0, "time_limit": 0.0,
+		"obj": {"type": "escape", "desc": "突围：抵达撤离点"},
 		"waves": [
 			{"type": "infantry", "count": 9, "delay": 1.0, "bearings": [0.0]},
 			{"type": "infantry", "count": 8, "delay": 7.0, "bearings": [2.3]},
@@ -235,6 +236,7 @@ const ENCOUNTERS := {
 	},
 	"pincer": {
 		"name": "钳形", "pressure": 6, "time_limit": 0.0,
+		"obj": {"type": "escape", "desc": "突破：抵达对面集结点"},
 		"waves": [
 			{"type": "infantry", "count": 11, "delay": 1.0, "bearings": [0.0]},
 			{"type": "infantry", "count": 10, "delay": 6.0, "bearings": [3.14]},
@@ -244,6 +246,7 @@ const ENCOUNTERS := {
 	},
 	"outpost": {
 		"name": "前哨", "pressure": 8, "time_limit": 0.0,
+		"obj": {"type": "kill", "desc": "歼灭：摧毁前哨全部守军"},
 		"waves": [
 			{"type": "infantry", "count": 3, "delay": 2.0, "bearings": [0.0]},
 			{"type": "armored", "count": 1, "delay": 10.0, "bearings": [0.8]},
@@ -252,6 +255,7 @@ const ENCOUNTERS := {
 	},
 	"anvil": {
 		"name": "铁砧", "pressure": 10, "time_limit": 0.0,
+		"obj": {"type": "hold", "desc": "坚守 90 秒", "need": 90.0},
 		"waves": [
 			{"type": "armored", "count": 2, "delay": 2.0, "bearings": [0.0]},
 			{"type": "infantry", "count": 6, "delay": 8.0, "bearings": [0.9]},
@@ -261,6 +265,7 @@ const ENCOUNTERS := {
 	},
 	"silence": {
 		"name": "静默", "pressure": 10, "time_limit": 0.0,
+		"obj": {"type": "escape", "desc": "突围：离开静默区"},
 		"waves": [
 			{"type": "infantry", "count": 10, "delay": 6.0, "bearings": [0.6, 2.5]},
 			{"type": "ew", "count": 1, "delay": 14.0, "bearings": [1.6]},
@@ -269,6 +274,7 @@ const ENCOUNTERS := {
 	},
 	"escort": {
 		"name": "护送", "pressure": 8, "time_limit": 60.0,
+		"obj": {"type": "kill", "desc": "拦截：击毁回收型"},
 		"waves": [
 			{"type": "recovery", "count": 1, "delay": 1.0, "bearings": [0.3]},
 			{"type": "infantry", "count": 6, "delay": 4.0, "bearings": [0.3]},
@@ -277,6 +283,7 @@ const ENCOUNTERS := {
 	},
 	"boss": {
 		"name": "牧羊人", "pressure": 14, "time_limit": 0.0,
+		"obj": {"type": "boss", "desc": "讨伐：击破牧羊人"},
 		"waves": [
 			{"type": "shepherd", "count": 1, "delay": 2.0, "bearings": [0.0]},
 			{"type": "infantry", "count": 8, "delay": 6.0, "bearings": [0.7, 2.4]},

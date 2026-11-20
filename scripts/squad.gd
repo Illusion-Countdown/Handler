@@ -8,7 +8,7 @@ signal member_died(mech)
 
 var members: Array = []
 var battle = null
-var stance: String = "hold"
+var stance: String = "attack"
 var roe: String = "nearest"
 var center: Vector2 = Vector2.ZERO
 var dest: Vector2 = Vector2.ZERO
@@ -162,19 +162,34 @@ func _move_squad(dt: float, battle) -> void:
 	if silence_t > 0.0:
 		spd *= 0.7
 	var tgt := center
-	# 移动完全由玩家点击决定：不再自动冲向敌人
+	# 有指令 → 执行指令；没指令 → 按姿态自主行动
 	if has_dest:
 		tgt = dest
 		if center.distance_to(dest) < 18.0:
 			center = dest
 			has_dest = false
 			tgt = center
-	elif stance == "withdraw" and not broken:
+	elif broken:
 		tgt = _retreat_point(battle)
-	elif stance == "maneuver":
+	else:
+		var goal: Vector2 = battle.objective_point() if battle != null else center
 		var e = _nearest_enemy(battle)
-		if e != null and center.distance_to(e.position) < 240.0:
-			tgt = center + (center - e.position).normalized() * 55.0
+		match stance:
+			"attack":
+				# 附近有敌人就压上去，否则推进目标点
+				if e != null and center.distance_to(e.position) < 560.0:
+					tgt = e.position
+				else:
+					tgt = goal
+			"hold":
+				tgt = center
+			"maneuver":
+				if e != null and center.distance_to(e.position) < 260.0:
+					tgt = center + (center - e.position).normalized() * 60.0
+				else:
+					tgt = goal
+			"withdraw":
+				tgt = goal
 
 	var to := tgt - center
 	var dl := to.length()

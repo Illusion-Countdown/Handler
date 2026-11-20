@@ -41,6 +41,15 @@ var shake: float = 0.0
 var terrain: Array = []
 var rng := RandomNumberGenerator.new()
 var priority_channel: bool = false
+var objective: Dictionary = {}
+var exit_pos: Vector2 = Vector2.ZERO
+var reach_t: float = 0.0
+var boss_ref = null
+var boss_summon_t: float = 0.0
+var vision_charges: int = 3
+var vision_t: float = 0.0
+const VISION_MAX := 3
+const VISION_REGEN := 5.0
 var thermal_t: float = 0.0
 var jam_center: Vector2 = Vector2.ZERO
 var jam_t: float = 0.0
@@ -70,10 +79,31 @@ func _ready() -> void:
 
 
 func begin() -> void:
+	objective = encounter.get("obj", {"type": "kill", "desc": "歼灭全部军团"})
+	exit_pos = _pick_exit()
 	if waves.size() > 0:
 		_spawn_wave(0)
 	wave_idx = 1
 	wave_t = 0.0
+
+
+func _pick_exit() -> Vector2:
+	var c := map_center()
+	var ang := rng.randf() * TAU
+	var r: float = min(world_size.x, world_size.y) * 0.40
+	var p: Vector2 = c + Vector2.RIGHT.rotated(ang) * r
+	p.x = clamp(p.x, 90.0, world_size.x - 90.0)
+	p.y = clamp(p.y, 90.0, world_size.y - 90.0)
+	return p
+
+
+func objective_point() -> Vector2:
+	var ty: String = String(objective.get("type", "kill"))
+	if ty == "escape" or ty == "reach":
+		return exit_pos
+	if ty == "boss" and boss_ref != null and not boss_ref.dead:
+		return boss_ref.position
+	return map_center()
 
 
 func _build_layers() -> void:
@@ -321,11 +351,14 @@ func _spawn_wave(i: int) -> void:
 		_sfx("sfx_wave", 0.6, -6.0)
 		if String(w["type"]) == "armored" or String(w["type"]) == "shepherd":
 			_sfx("sfx_alarm", 0.6, -6.0)
+	var groups: int = 3
 	for k in range(count):
-		var b: float = float(bearings[k % bearings.size()])
-		if count > 1:
-			b += rng.randf_range(-0.16, 0.16)
-		var pos: Vector2 = center + Vector2.RIGHT.rotated(b) * radius
+		var gi: int = k % groups
+		var b: float = float(bearings[k % bearings.size()]) + (float(gi) - 1.0) * 0.85
+		b += rng.randf_range(-0.22, 0.22)
+		var rr: float = radius * rng.randf_range(0.82, 1.18)
+		var pos: Vector2 = center + Vector2.RIGHT.rotated(b) * rr
+		pos += Vector2(rng.randf_range(-70.0, 70.0), rng.randf_range(-70.0, 70.0))
 		pos.x = clamp(pos.x, 30.0, world_size.x - 30.0)
 		pos.y = clamp(pos.y, 30.0, world_size.y - 30.0)
 		_spawn_legion(String(w["type"]), pos)
@@ -340,6 +373,8 @@ func _spawn_legion(kind: String, pos: Vector2, hp_mult: float = 1.0) -> void:
 		e.hp = e.max_hp
 	units_layer.add_child(e)
 	legions.append(e)
+	if kind == "shepherd":
+		boss_ref = e
 
 
 # ---------------- 主循环 ----------------
@@ -364,6 +399,11 @@ func shadow_update(delta: float) -> void:
 		if cp_t >= 45.0:
 			cp_t -= 45.0
 			cp = min(10.0, cp + 1.0)
+		if vision_charges < VISION_MAX:
+			vision_t += dt
+			if vision_t >= VISION_REGEN:
+				vision_t -= VISION_REGEN
+				vision_charges += 1
 		_update_waves(dt)
 		_update_orders(dt)
 		_update_squads(dt)
@@ -371,6 +411,7 @@ func shadow_update(delta: float) -> void:
 		_update_combat(dt)
 		_separate(dt)
 		_update_recoveries(dt)
+		_update_boss(dt)
 		_update_fog(dt)
 		cp = min(10.0, cp)
 		if thermal_t > 0.0:
@@ -645,6 +686,8 @@ func _mech_attack(m, e) -> void:
 		dmg *= 1.5
 	if m.squad != null and e == m.squad.focus:
 		dmg *= m.squad.focus_power
+	if e == boss_ref and e.exposed > 0.0:
+		dmg *= 2.0
 	if e.marked > 0.0:
 		dmg *= 1.4
 	if m.squad != null and m.squad.no_retreat_t > 0.0:
@@ -777,6 +820,26 @@ func _on_mech_death(m) -> void:
 		m.squad.on_member_died(m)
 
 
+func _update_boss(dt: float) -> void:
+	if boss_ref == null or boss_ref.dead:
+		return
+	boss_summon_t += dt
+	if boss_summon_t >= 9.0:
+		boss_summon_t = 0.0
+		for k in range(3):
+			var a: float = randf() * TAU
+			var p: Vector2 = boss_ref.position + Vector2.RIGHT.rotated(a) * 150.0
+			_spawn_legion("infantry", p)
+		_push_hint("牧羊人正在召唤援军", 1.6)
+		_sfx("sfx_alarm", 0.6, -8.0)
+	# 弱点周期：每 9 秒睁开 3 秒
+	boss_ref.charge_cd -= dt
+	if boss_ref.charge_cd <= 0.0:
+		boss_ref.charge_cd = 9.0
+		boss_ref.exposed = 3.0
+		_push_hint("牧羊人核心暴露！", 1.2)
+
+
 func _update_recoveries(dt: float) -> void:
 	for c in recoveries:
 		if c["saved"] or c["taken"]:
@@ -804,6 +867,9 @@ func _update_fog(dt: float) -> void:
 		if m.dead:
 			continue
 		fog.stamp_mech(m, dt)
+	# BOSS 区域常亮（小怪进入也会被照亮）
+	if objective.get("type", "") == "boss" and boss_ref != null and not boss_ref.dead:
+		fog.stamp_pulse(boss_ref.position, 250.0)
 	fog.tick(dt)
 	for e in legions:
 		if e.dead:
@@ -938,6 +1004,13 @@ func _on_left_click(wp: Vector2) -> void:
 func _on_right_click() -> void:
 	if state != "fight":
 		return
+	if vision_charges <= 0:
+		_push_hint("视野脉冲冷却中…", 1.2)
+		_sfx("sfx_deny", 0.2, -10.0)
+		return
+	vision_charges -= 1
+	if vision_charges == VISION_MAX - 1:
+		vision_t = 0.0
 	var wp := _mouse_world()
 	# 半径随距离最近编队衰减
 	var alt := 7.0
@@ -1134,13 +1207,27 @@ func _check_end() -> void:
 	if alive_m == 0:
 		_finish(false)
 		return
-	if all_spawned:
-		var alive_e := 0
-		for e in legions:
-			if not e.dead:
-				alive_e += 1
-		if alive_e == 0:
-			_finish(true)
+	var ty: String = String(objective.get("type", "kill"))
+	var won := false
+	match ty:
+		"hold":
+			won = elapsed >= float(objective.get("need", 90.0))
+		"escape", "reach":
+			var inside := false
+			for sq in squads:
+				if sq.center.distance_to(exit_pos) < 115.0:
+					inside = true
+			if inside:
+				reach_t += get_process_delta_time()
+			else:
+				reach_t = max(0.0, reach_t - get_process_delta_time() * 0.6)
+			won = reach_t >= 1.5
+		"boss":
+			won = boss_ref != null and boss_ref.dead
+		_:
+			won = all_spawned and legion_alive() == 0
+	if won:
+		_finish(true)
 
 
 var _pending_res: Dictionary = {}
@@ -1254,6 +1341,14 @@ func _draw_overlay() -> void:
 			overlay.draw_circle(sq.center, 26.0 * k, Color(0.25, 0.62, 0.85, 0.035))
 		# 方位提示
 		_draw_warning(sq)
+	# 撤离点 / 目标点
+	var oty: String = String(objective.get("type", "kill"))
+	if oty == "escape" or oty == "reach":
+		var pulse := 0.5 + 0.5 * sin(t * 2.6)
+		overlay.draw_arc(exit_pos, 70.0, 0.0, TAU, 40, Color(0.35, 0.95, 0.8, 0.25 + 0.25 * pulse), 2.0)
+		overlay.draw_arc(exit_pos, 46.0, 0.0, TAU, 32, Color(0.5, 1.0, 0.9, 0.5), 2.4)
+		overlay.draw_line(exit_pos + Vector2(0, -34), exit_pos + Vector2(0, 34), Color(0.6, 1.0, 0.9, 0.7), 2.0)
+		overlay.draw_line(exit_pos + Vector2(-34, 0), exit_pos + Vector2(34, 0), Color(0.6, 1.0, 0.9, 0.7), 2.0)
 	# 集火锁定标记
 	for sq in squads:
 		if sq.focus == null or sq.focus.dead or not sq.focus.visible:

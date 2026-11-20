@@ -113,18 +113,19 @@ func _run_test() -> void:
 		return
 	print("[TEST] battle started, waves=", battle.waves.size(), " mechs=", battle.mechs.size())
 	# 移动指令验收：点一个 300px 外的点，看它是否走到并停下
-	var move_from: Vector2 = battle.squads[0].center
-	var move_to: Vector2 = move_from + Vector2(300, 0)
+	var move_to: Vector2 = battle.exit_pos
 	battle._issue_order(battle.squads[0], {"cmd": "move", "pos": move_to})
-	print("[MOVE] from=", move_from, " to=", move_to)
+	print("[MOVE] obj=", battle.objective.get("type", "?"), " exit=", move_to)
 	for i in range(1200):
 		battle.shadow_update(1.0 / 30.0)
 		if battle == null:
 			break
-		if i % 30 == 0 and battle != null and i < 420:
+		if i % 90 == 0 and battle != null:
 			print("[MOVE] t=", snapped(battle.elapsed, 0.1),
 				" dist=", snapped(battle.squads[0].center.distance_to(move_to), 1.0),
-				" has_dest=", battle.squads[0].has_dest)
+				" reach_t=", snapped(battle.reach_t, 0.1),
+				" state=", battle.state,
+				" win=", battle._pending_res.get("win", "?"))
 		if i % 150 == 0 and battle != null:
 			var l0 = battle.legions[0] if battle.legions.size() > 0 else null
 			var mh := []

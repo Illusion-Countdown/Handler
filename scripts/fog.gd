@@ -128,8 +128,6 @@ func _rebuild() -> void:
 		var a := 1.0
 		if visible_bits[i] == 1 or pulsed[i] > 0.0:
 			a = 0.0
-		elif remembered[i] > 0.0:
-			a = 1.0 - 0.45 * clamp(remembered[i] / MEM_FADE, 0.0, 1.0)
 		var o: int = i * 4
 		data[o] = 1
 		data[o + 1] = 2

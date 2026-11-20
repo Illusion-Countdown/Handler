@@ -58,6 +58,7 @@ func _draw_hud() -> void:
 	_draw_cards(vs)
 	_draw_hint(vs)
 	_draw_footer(vs)
+	_draw_objective(vs)
 	_draw_pause(vs)
 	_draw_over(vs)
 
@@ -68,6 +69,31 @@ func _draw_over(vs: Vector2) -> void:
 	canvas.draw_rect(Rect2(Vector2.ZERO, vs), Color(0.0, 0.02, 0.05, 0.45))
 	canvas.draw_string(font, Vector2(vs.x * 0.5 - 240, vs.y * 0.5), "作 战 结 束",
 		HORIZONTAL_ALIGNMENT_CENTER, 480, 40, Color(0.8, 0.95, 1.0))
+
+
+func _draw_objective(vs: Vector2) -> void:
+	if battle.objective.is_empty():
+		return
+	var ty: String = String(battle.objective.get("type", "kill"))
+	var desc: String = String(battle.objective.get("desc", ""))
+	var line := desc
+	match ty:
+		"hold":
+			line += "    剩余 %d 秒" % int(max(0.0, float(battle.objective.get("need", 90.0)) - battle.elapsed))
+		"escape", "reach":
+			var best := 1e20
+			for sq in battle.squads:
+				best = min(best, sq.center.distance_to(battle.exit_pos))
+			line += "    距离 %d" % int(best)
+		"boss":
+			if battle.boss_ref != null and not battle.boss_ref.dead:
+				line += "    核心 %d%%" % int(battle.boss_ref.hp_frac() * 100.0)
+	canvas.draw_string(font, Vector2(vs.x * 0.5 - 300, 40), line, HORIZONTAL_ALIGNMENT_CENTER,
+		600, 18, Color(1.0, 0.86, 0.42))
+	# 视野充能
+	var charge_txt := "视野 %d / %d" % [battle.vision_charges, battle.VISION_MAX]
+	canvas.draw_string(font, Vector2(vs.x * 0.5 - 300, 64), charge_txt, HORIZONTAL_ALIGNMENT_CENTER,
+		600, 12, Color(0.55, 0.75, 0.9))
 
 
 func _draw_pause(vs: Vector2) -> void:
